@@ -1,0 +1,26 @@
+1) what are Pre-requisites for running script?
+   a) you need python version 2.7.4 or higher (not 3.xxx)
+   b) we don't have setup.py ready yet (appologies), If you don't python interpreter in 
+      /router/bin/python-2.7.4  you need to change the first line of script point to correct path  
+
+
+2) How to run Accelerated Upgrade ?
+====================================
+syntax:
+./accelerated_upgrade.py  -l <username> -p <password> -r <package repository path> -d <device to upgrade> -f <name of the package file list> [other optional arguments -c -o -t -D -h]
+
+Example:
+E1)
+./accelerated_upgrade.py  -l 'lab' -p 'lab' -r 'tftp://223.255.254.254/auto/tftp-blr-users1/syaragat/' -d "172.19.71.74 2035" -f packages.txt  -c cmd_file
+
+E2) To run only pre-upgrade or comman plugins of pre and post upgrade checks
+
+./accelerated_upgrade.py  -l 'lab' -p 'cisco ' -r 'tftp://223.255.254.254/auto/tftpboot-users-sj/syaragat/' -d "172.19.71.74 2035"  -f packages.txt  -k  --pre-upgrade-checks-only
+
+To know all the options just run program with -h
+
+3) Plugins
+==============
+all plugins are place under directory plugins/
+
+
