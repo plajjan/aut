@@ -1,0 +1,533 @@
+#!/router/bin/python-2.7.4
+
+#==============================================================================
+# accelerated_upgrade.py -  main routine for accelerated upgrade
+# utility, takes care of connecting to box, starting and running
+# plugin manager.
+#
+# Jun 2013, skewat
+#
+# Copyright (c)  2013, Cisco Systems
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without modification, 
+# are permitted provided that the following conditions are met:
+#
+# Redistributions of source code must retain the above copyright notice, 
+# this list of conditions and the following disclaimer.
+# Redistributions in binary form must reproduce the above copyright notice, this list of conditions
+# and the following disclaimer in the documentation and/or other materials provided with the distribution.
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS 
+# OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+# OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# ==============================================================================
+
+import os
+import sys
+import re
+import string
+import pexpect
+import getopt
+import inspect
+import threading
+import time
+from time import sleep
+from lib import plugins_manager
+from lib.parser import *
+from lib.global_constants import *
+
+term = "telnet"
+repository = ""
+pkg_list_file = ""
+cmd_file = ""
+good_count = []
+unknown_count = []
+timeout_count = []
+badlp_count = []
+key_count = []
+reset_count = []
+refused_count = []
+start_time = {}
+login =""
+verbose=""
+clist =""
+command=""
+passwd=""
+
+def main():
+    status = 0
+    options,args = parsecli()
+    login = options.login
+    passwd = options.password
+    dlist  = options.devices
+    device = options.device
+    verbose= options.verbose
+    pkg_list_file = options.pkg_file
+    drange = []
+    if login and passwd and dlist and clist or \
+       login and passwd and device or \
+       login and passwd and dlist or \
+       login and passwd and device and command or \
+       login and passwd and dlist and command or \
+       login and passwd and device and clist or \
+       login and dlist and clist or \
+       login and device and command or \
+       login and dlist and command or \
+       login and device and clist:
+        if dlist:
+            print "file list %s" % dlist
+            device_list = open(dlist, 'r')
+            for line in device_list:
+                line = re.sub("\n$", "", line)
+                drange.append(line)
+            device_list.close()
+        else:
+            drange.append(device)
+        threads = []
+        nloops = range(len(drange))
+        print drange
+        for dline in drange:
+            dline = [dline]
+            print dline
+            after = thread_command(command_exec, (dline, options), command_exec.__name__)
+            threads.append(after)
+        for i in nloops:
+            threads[i].start()
+            sleep(1)
+        for i in nloops:
+            threads[i].join()
+    else:
+        print "="*30," Usage info ","="*30 
+        usage()
+        print "-"*80
+
+    print "Total host that passed %d" % len(good_count)
+    for line in good_count:
+        print line, "Total elapsed time : %s"%(elapsed_time(line))
+    if len(unknown_count) :
+        print "Total host that failed %d" % len(unknown_count)
+        for line in unknown_count:
+            print line
+    if len(badlp_count) :
+        print "Total host that had either incorrect login or passwords %d" % len(badlp_count)
+        for line in badlp_count:
+            print line
+    if len(timeout_count) :
+        print "Total host that timed out %d" % len(timeout_count)
+        for line in timeout_count:
+            print line
+    if len(reset_count) :
+        print "Total host that were reset by peer or Connection Closed by Peer %d" % len(reset_count)
+        for line in reset_count:
+            print line
+    if len(key_count) :
+        print "Total host that Host Key Verification Failed on %d" % len(key_count)
+        for line in key_count:
+            print line
+    if len(refused_count) :
+        print "Total host that Connection was refused on %d\n Check Access List" % len(refused_count)
+        for line in refused_count:
+            print line
+    # Fix dos2unix 
+
+def escalated_priv(cmd, host):
+    try:
+        priv = re.sub("\\\\", "", enable)
+    except:
+        priv = passwd
+    status = 0
+    if PRIVALEGE.search(cmd):
+        if command:
+            host.sendline(cmd)
+        elif clist:
+            host.send(cmd)
+        status = host.expect([PASS, PROMPT, EOF], timeout=tout)
+        if status == 0:
+            host.sendline(priv)
+            status = host.expect([LOGIN_PROMPT, PASS,  EOF])
+            if status == 0:
+                print "I'm in enable mode"
+            elif status == 1:
+                print "Password Incorrect"
+            else:
+                print "status ", status
+        elif status == 1:
+            status = 0
+    return( status, host )
+def ssh_login( host ):
+    host = host[0]
+    authorized = False
+    status = 0
+    session = "ssh " + login+"@"+host
+    command = pexpect.spawn( session, maxread=MAXREAD, searchwindowsize=WINDOWSIZE )
+    if term == "ssh" or term == "both":
+        if verbose:
+            print "connecting to %s using %s" % (host, session)
+        try:
+            status = command.expect_exact( [NEWSSHKEY, PASS, MODULUS_TO_SMALL, PROTOCOL_DIFFER, LOGIN_PROMPT, EOF, HOST_KEY_FAILED, CONNECTION_REFUSED, RESET_BY_PEER], timeout=tout )
+        except:
+            status = 10
+            return( status, command )
+        if status == 2:
+            if verbose:
+                print "Protocol Version 2 failed with host key to small, Trying to connect to host using ssh Protocol version 1"
+            session = "ssh -1 " + login+"@"+host
+            command = pexpect.spawn( session, maxread=MAXREAD, searchwindowsize=WINDOWSIZE )
+            if verbose:
+                print "connecting to %s using %s" % (host, session)
+            status = command.expect_exact( [NEWSSHKEY, PASS, MODULUS_TO_SMALL, PROTOCOL_DIFFER,  EOF], timeout=tout )
+            if status == 3:
+                if verbose:
+                    print "Protocol MisMatch"
+        if status == 0:
+            if verbose:
+                print "saying yes to accepting ssh key"
+            command.sendline("yes")
+            status = command.expect_exact( [PASS, LOGIN_PROMPT, EOF] )
+            if status == 0:
+                command.sendline( passwd )
+                status = command.expect_exact( [USERNAME, PASS, PERMISSION_DENIED, LOGIN_PROMPT, LOGIN_PROMPT_ERR, EOF], timeout=tout )
+                if status == 0 or status == 1 or status == 2:
+                    if verbose:
+                        print "Password Incorrect %s" % PERMISSION_DENIED
+                    status = 9
+                elif status == 3:
+                    if verbose:
+                        print "%s Authenticated, through ssh" % host
+                    status = 0
+            if status == 1:
+                status = 0
+                pass
+        elif status == 1:
+            if verbose:
+                print "ssh key already in host file"
+            command.sendline('\x03')
+            command.close()
+            command = pexpect.spawn( session, maxread=MAXREAD, searchwindowsize=WINDOWSIZE )
+            status = command.expect_exact( [PASS, EOF] )
+            if status == 0:
+                command.sendline( passwd )
+                command.sendline('\r\n')
+                status = command.expect_exact( [USERNAME, PASS, PERMISSION_DENIED, LOGIN_PROMPT,LOGIN_PROMPT_ERR, EOF], timeout=tout )
+                if status == 0 or status == 1 or status == 2:
+                    if verbose:
+                        print "Password Incorrect %s" % PERMISSION_DENIED
+                    status = 9
+                elif status == 3:
+                    if verbose:
+                        print "%s Authenticated, through ssh" % host
+                    status = 0
+        elif status == 4:
+            status = 0
+        elif status == 6:
+            if verbose:
+                print "Host Key Verification Failed for %s" % host
+        elif status == 7:
+            if verbose:
+                print "Connection to %s was refused" % host
+        elif status == 8:
+            if verbose:
+                print "Connection to %s was reset by peer" % host
+    return( status, command ) 
+
+def fix_lf_cr(str_in):
+    # In general
+    str_out = str_in.replace([0x0d,0x0a],'')
+    return str_in
+
+
+def telnet_login(host_list, login, passwd, connect_retry = 1):
+    host = host_list[0]
+    authorized = False
+    status = 0
+    session = "telnet " + host
+    command = pexpect.spawn( session, maxread=MAXREAD, searchwindowsize=WINDOWSIZE  )
+    if term == "telnet":
+        #print "Connecting to %s using %s" % ( host, session )
+        # Initial "CR"
+        command.sendline()
+        sleep(5)
+        try:
+            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "ios#"], timeout=tout )
+        except:
+            status = 10
+            print >>sys.stderr, command.before
+            return( status, command )
+        if status == 0 :
+            # Username: prompt
+             command.sendline(login)
+             #print "Sending login", login,status,command.before,command.after
+             try:
+                status = command.expect_exact( [PASS, EOF, CONNECTION_REFUSED, LOGIN_PROMPT, RESET_BY_PEER], timeout=tout )
+                if status == 0 or status == 3:
+                   command.sendline(passwd)
+                   #print"send pass ", passwd
+                   status = command.expect_exact( ['#'],timeout=tout)
+                   status=0
+                   return( status, command )
+             except:
+                   status = 10
+                   return( status, command )
+
+        elif status == 1:
+            print "Logging in using telnet", status
+            if status == 0:
+                command.sendline(login)
+                status = command.expect_exact( [PASS, EOF], timeout=tout )
+                print "Logging in using telnet", status
+                if status == 0:
+                    command.sendline(passwd)
+                    status = command.expect_exact( [USERNAME, PASS, PERMISSION_DENIED, LOGIN_PROMPT, EOF], timeout=tout )
+                    print "Logged int ...."
+            elif status == 1:
+                command.sendline(passwd)
+                status = command.expect( [USERNAME, PASS, PERMISSION_DENIED, LOGIN_PROMPT, EOF], timeout=tout )
+            if status == 0 or status == 1 or status == 2:
+                print "Password Incorrect %s" % PERMISSION_DENIED
+                status = 9
+            elif status == 3:
+                print "%s Authenticated, through telnet" % host
+                status = 0
+        elif status == 2 or status == 3 :
+            print "Connection to %s was refused" % host
+            status = 7
+        elif status == 4 :
+            # Already logged in prompt
+            status = 0
+            return( status, command )
+                    
+        return( status, command )
+
+
+def telnet_logout(session):
+    print "Logging out..",
+
+def wait_loop(sec):
+     bang = 0
+     while bang<(sec/4):
+         try :
+             sleep(4)
+             sys.stdout.write('!')
+             sys.stdout.flush()
+             bang = bang + 1
+         except KeyboardInterrupt:
+             # quit
+             sys.exit("Keyboard interupt by user")
+
+def command_exec(dline, options):
+    kwargs = {}
+    auth = 0
+    save = 1
+    cur_time = time.strftime("%d%m%Y%H%M%S", time.gmtime())
+
+    if save:
+        if dline[0] :
+            s_out = str(dline[0]).replace(" ",'_')
+        elif dline[0][0] : 
+            s_out = str(dline[0][0]).replace(" ",'_')
+        if os.path.exists(s_out+'.txt'):
+             os.system("mv %s.txt %s.txt.%s"%(s_out,s_out,cur_time))
+        start_time[str(s_out)] = time.time()
+        try:
+            save_out = file(s_out+'.txt', "w")
+        except:
+            save_out = file(s_out+'.txt', "w")
+
+    if term == "ssh":
+        auth, host = ssh_login( dline )
+    elif term == "telnet":
+        auth, host = telnet_login( dline, options.login, options.password)
+    elif term == "both":
+        auth, host = ssh_login( dline )
+        if auth != 0 and auth != 9:
+            auth, host = telnet_login( dline, options.login, options.password )
+            if auth != 0:
+                if verbose:
+                    print auth, " ssh and telnet failed"
+    else: 
+       print bcolors.FAIL +"No such terminal is supported:",term +bcolors.ENDC
+       sys.exit(0)
+
+    if auth == 0:
+        good_count.append(dline[0])
+        if clist:
+            command_list = open(clist, 'r')
+        else:
+            command_list = command
+        if not host:
+           sys.exit("Connection refused..!")
+        if save:
+            host.logfile=save_out
+        #=======================================
+        # log succeed, go ahead  and start 
+        # plugin manager
+        #=======================================
+        run_status = blast_plugins(host, options)
+       
+        if run_status == NO_PLUGINS:
+           print_warning("++++ No plugins found in the repository++++")
+           host.sendline('exit')
+           host.close()
+
+        #=======================================
+        # after upgrade if box goes for reload
+        # wait for box to comes up with new 
+        # softwer to run post upgrade plugins
+        #======================================
+        
+        if run_status == SYSTEM_RELOADED and options.upgradeset == 0:
+           print_success("\n++++ Done with PreUpgrade checks and Upgrade ++++")
+           # wait for a minute complete install operation
+           # after success
+           print_success("\n++++ Please wait while install completes  ++++")
+           wait_loop(60)
+           print ""
+           #Shutdown session gracefully
+           host.sendline('quit')
+           host.sendline('exit')
+           host.close()
+           retry=0
+           while retry<30:
+               try:
+                   # wait for a minute to retry
+                   auth, host = telnet_login( dline, options.login, options.password)
+                   #check were we able to login
+                   if auth == 0:
+                      #after console is available wait some time nodes to comeup
+                      if retry > 0:
+                         print_success("\n++++ Waiting for nodes to come up ++++")
+                         wait_loop(5*60) 
+                      #modify options to run only post upgrade checks
+                      options.preupgradeset = 0
+                      options.upgradeset = 0
+                      options.postupgradeset = 1 
+                      print_success("\n++++ Starting Postupgrade checks ++++")
+                      run_status = blast_plugins(host, options)
+                      break
+                   else:
+                       print_success("\n++++ Please wait for System to reload ++++")
+                       wait_loop(60)
+                       retry=retry+1
+               except KeyboardInterrupt:
+                   # quit
+                   sys.exit("Keyboard interupt by user")
+        status = run_status
+        #try :
+        #    status = host.expect_exact( [INVALID_INPUT, MORE, PROMPT, EOF], timeout=tout )
+        #except :
+        #    print "Command did not run correctly: ",host.before, host.after
+        #     sys.exit(1)
+
+        #if status == 0:
+        #    print "Command did not run correctly: ", host.before, host.after
+        #    sys.exit(1)
+        if status == 1:
+            print host.before 
+            while status == 1:
+                host.send('\x20')
+                status = host.expect( [INVALID_INPUT, MORE, PROMPT, EOF], timeout=tout )
+                print host.before 
+                print host.match.group() 
+        else:
+           pass
+                            
+        if save:
+            save_out.close()
+    elif auth == 10:
+        print "TIMED OUT, could not connect to %s" % dline[0]
+        timeout_count.append(dline[0])
+    elif auth == 9:
+        print "Permission Denied, could not connect to %s" % dline[0]
+        badlp_count.append(dline[0])
+    elif auth == 6:
+        print "Ssh Host Key Verification Failed, could not connect to %s" % dline[0]
+        key_count.append(dline[0])
+    elif auth == 7:
+        print "Could not connect to %s, Connection was refused" % dline[0]
+        refused_count.append(dline[0])
+    elif auth == 8:
+        print "Could not connect to %s,  Because connected was reset by peer" % dline[0]
+        reset_count.append(dline[0])
+    else:
+        print "%s not Authenticated" % dline[0]
+        unknown_count.append(dline[0])
+
+    try:
+       host.sendline('quit')
+       sleep(1)
+       host.sendline('exit')
+       host.close()
+    except:
+       pass 
+
+    print >>sys.stderr, "_"*80
+class thread_command(threading.Thread):
+  def __init__(self, func, args, name=''):
+      threading.Thread.__init__( self )
+      self.name = name
+      self.func = func
+      self.args = args
+  def run(self):
+      apply(self.func, self.args)
+            
+def elapsed_time(device):
+    """ Report the time taken for execution """
+    global start_time
+
+    # Ignore if the time is not recorded for the device
+    if not start_time.has_key(device.replace(" ","_")):
+        return "Not recorded for %s"%device
+    int_start_time = start_time[device.replace(" ","_")]
+    time_str = ""
+    seconds = int(time.time() - int_start_time)
+    hrs   = seconds/3600
+
+    if hrs > 0:
+        seconds = seconds - 3600 * hrs
+        time_str += "%dh " % (hrs)
+
+    mins = seconds/60
+    if mins > 0:
+        seconds = seconds - 60 * mins
+        time_str += "%dm " % (mins)
+
+    time_str += "%ds" % (seconds)
+    return time_str
+
+def blast_plugins(host, options):
+        kwargs = {}
+        kwargs['session']  =  host
+        kwargs['repository'] = options.repository_path
+        kwargs['pkg-file-list'] = options.pkg_file
+        kwargs['cmd_file'] = options.cli_file
+        kwargs['options'] = options
+        if cmd_file and not os.path.isfile(kwargs['cmd_file']):
+           print bcolors.WARNING +"++++++++ %s file doesn't exist +++++++++"%(options.pkg_file) + bcolors.ENDC
+           sys.exit(0)
+        try:
+          if options.pkg_file and os.path.getsize(options.pkg_file) < 1 :
+             print bcolors.WARNING +"++++++++ No packages found in file %s  +++++++++"%(options.pkg_file) + bcolors.ENDC
+             sys.exit(0)
+        except:
+             print bcolors.WARNING +"++++++++  %s doesn't exist  +++++++++"%(options.pkg_file) + bcolors.ENDC
+             sys.exit(0)
+        PluginsManager = plugins_manager.PluginsManager()
+        plugins = PluginsManager.load_plugins()
+        if plugins :
+            status=PluginsManager.start(**kwargs)
+            print "Done with all plugins..",status
+            return status
+        else:
+           return NO_PLUGINS 
+
+
+if __name__ == '__main__':
+    if os.path.exists("plugins"):
+        sys.path.insert(0,os.path.abspath("plugins"))
+    main()
+
