@@ -1,6 +1,6 @@
 1) what are Pre-requisites for running script?
    a) you need python version 2.7.4 or higher (not 3.xxx)
-   b) we don't have setup.py ready yet (appologies), If you don't python interpreter in 
+   b) we don't have setup.py ready yet (apologies), If you don't python interpreter in 
       /router/bin/python-2.7.4  you need to change the first line of script point to correct path  
 
 
