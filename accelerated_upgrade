@@ -1,4 +1,4 @@
-#!/router/bin/python-2.7.4
+#! /router/bin/python
 
 #==============================================================================
 # accelerated_upgrade.py -  main routine for accelerated upgrade
