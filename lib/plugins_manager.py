@@ -261,7 +261,7 @@ class PluginsManager(object):
             return_status = {i.plugin_name:status}
             results.update(return_status)
              
-            if status == SUCCESS or status == SYSTEM_RELOADED:
+            if status == SUCCESS or status == SYSTEM_RELOADED or status == INSTALL_METHOD_PROCESS_RESTART :
                 print >> sys.stdout,bcolors.OKGREEN +"\nPassed => %s\n"%(i.plugin_name)+ bcolors.ENDC
             elif status == IGNORE:
                   print >> sys.stdout,bcolors.WARNING +"\nIgnoring => %s\n"%(i.plugin_name)+ bcolors.ENDC

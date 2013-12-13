@@ -410,7 +410,7 @@ def command_exec(dline, options):
                       run_status = blast_plugins(host, options)
                       break
                    else:
-                       print_success("\n++++ Please wait for System to reload ++++")
+                       print_success("\n++++ Please wait ..reconnecting to the box ++++")
                        wait_loop(60)
                        retry=retry+1
                except KeyboardInterrupt:
@@ -466,6 +466,7 @@ def command_exec(dline, options):
        pass 
 
     print >>sys.stderr, "_"*80
+
 class thread_command(threading.Thread):
   def __init__(self, func, args, name=''):
       threading.Thread.__init__( self )
@@ -520,7 +521,7 @@ def blast_plugins(host, options):
         plugins = PluginsManager.load_plugins()
         if plugins :
             status=PluginsManager.start(**kwargs)
-            print "Done with all plugins..",status
+            print "Done with all plugins..",
             return status
         else:
            return NO_PLUGINS 

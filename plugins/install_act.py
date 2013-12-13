@@ -39,6 +39,8 @@ LOG_FILE                = "/tmp/acc_log.txt"
 ERROR_LOG_FILE          = "/tmp/acc_err_log.txt"
 XML_ACT_FILE            = "/tmp/accel_upgrade_act.xml"
 XML_ACT_RESPONSE_FILE   = "/tmp/accel_upgrade_act_response.xml"
+RELOAD_MEG  = "Info:     Install Method: Parallel Reload"
+RESTART_MSG = "Info:     Install Method: Parallel Process Restart"
 
 class IPlugin:
     """
@@ -132,6 +134,7 @@ class IPlugin:
                 act_id = open(XML_ADD_RESPONSE_FILE,"w")
                 act_id.write(self.id)
                 act_id.close()
+                retval = self.get_install_impact()
    
         except pexpect.EOF:
             self.error_log_file.write("EOF encountered when expecting for other input\n")
@@ -144,8 +147,18 @@ class IPlugin:
 
         return int(retval)
 
-
-
+    def get_install_impact(self):
+        cmd = "admin show install log %d"%(int(self.id))
+        self.command_exec.sendline(cmd)
+        try:
+            index = self.command_exec.expect([RELOAD_MSG, RESTART_MSG],searchwindowsize=1000,timeout=30)
+            if ((index == 1)):
+                return INSTALL_METHOD_PROCESS_RESTART
+            elif (index == 0):
+                return SYSTEM_RELOADED
+        except : 
+            # Optimist expectation
+            return INSTALL_METHOD_PROCESS_RESTART
 
     def install_getID(self):
         """
