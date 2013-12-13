@@ -134,24 +134,6 @@ class IPlugin(object):
         except :
             pass
 
-        host.sendline("show filesystem location  0/RP1/CPU0")        
-        try :
-            status = host.expect_exact( [INVALID_INPUT, MORE,"show filesystem location", "No such node","% Invalid input detected at",
-                                          LOGIN_PROMPT_ERR, EOF], timeout=180)
-        except :
-            if status == 3:
-               pass # Fix me
-
-        if status != 2 and status != 3 and status !=4:
-           disk_rp1 = get_free_space(host.before.split("\n"))
-        else:
-           disk_rp1 = 0
-           print bcolors.WARNING + "No Standby(0/RP1/CPU0) node found .." + bcolors.ENDC
-
-        try :
-            host.expect_exact("#", timeout=30)
-        except :
-            pass
         # Get the package size
         fd = open(pkg_list,'r')
         total_req_size = 0
@@ -165,10 +147,8 @@ class IPlugin(object):
         fd.close()
 
         print "Active  : required bytes:%d available bytes:%d"%(total_req_size, disk_rp0) 
-        if (status != 3) and (status !=2) and (status!=4):
-           print "Standby : required bytes:%d available bytes:%d"%(total_req_size, disk_rp1)
 
-        if (disk_rp0 >= total_req_size) and ((status == 3 or status == 2 or status ==4) or (disk_rp1 >= total_req_size)) :
+        if (disk_rp0 >= total_req_size):
            return 0
 
         return -1
