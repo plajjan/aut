@@ -59,6 +59,7 @@ class IPlugin(object):
 		# Pass CLI's to box
                 host.sendline("show running")
                 try :
+                    status = host.expect_exact( [INVALID_INPUT, MORE, '\nend\r', EOF], timeout = tout_cmd)
                     status = host.expect_exact( [INVALID_INPUT, MORE, "#", EOF], timeout = tout_cmd)
                 except :
                     print "Command: Timed out, before considering this as failure"
