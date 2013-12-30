@@ -503,7 +503,12 @@ def elapsed_time(device):
 def blast_plugins(host, options):
         kwargs = {}
         kwargs['session']  =  host
-        kwargs['repository'] = options.repository_path
+
+        if options.repository_path.endswith("/"):
+            kwargs['repository'] = options.repository_path
+        else:
+            kwargs['repository'] = options.repository_path + "/"
+
         kwargs['pkg-file-list'] = options.pkg_file
         kwargs['cmd_file'] = options.cli_file
         kwargs['options'] = options
