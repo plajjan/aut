@@ -51,8 +51,14 @@ def parsecli():
     oparser.add_option("-l", "--login", dest="login", default=None, metavar='LOGIN',
         help="User name to login to the device. e.g.: -l admin.")
 
+    oparser.add_option("-L", "--login2", dest="login2", default=None, metavar='LOGIN2',
+        help="User name to 2nd login to the device. e.g.: -L admin.")
+
     oparser.add_option("-p", "--passwd", dest="password", default=None, metavar='PASSWORD', 
         help="Login password for the device. e.g.: -p passwd'.")
+
+    oparser.add_option("-P", "--passwd2", dest="password2", default=None, metavar='PASSWORD2', 
+        help="2nd Login password for the device. e.g.: -P passwd'.")
 
     oparser.add_option("-T", "--tunnel", dest="tunnel", default=None, metavar="'NAME'",
         help="List of inetremediate serevers to reach the device. e.g.: -T server-1,server-2")

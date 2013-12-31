@@ -159,6 +159,7 @@ def escalated_priv(cmd, host):
         elif status == 1:
             status = 0
     return( status, host )
+
 def ssh_login( host ):
     host = host[0]
     authorized = False
@@ -240,7 +241,6 @@ def fix_lf_cr(str_in):
     str_out = str_in.replace([0x0d,0x0a],'')
     return str_in
 
-
 def telnet_login(host_list, login, passwd, connect_retry = 1):
     host = host_list[0]
     authorized = False
@@ -263,16 +263,35 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
              command.sendline(login)
              #print "Sending login", login,status,command.before,command.after
              try:
-                status = command.expect_exact( [PASS, EOF, CONNECTION_REFUSED, LOGIN_PROMPT, RESET_BY_PEER], timeout=tout )
-                if status == 0 or status == 3:
-                   command.sendline(passwd)
-                   #print"send pass ", passwd
-                   status = command.expect_exact( ['#'],timeout=tout)
-                   status=0
-                   return( status, command )
+                 status = command.expect_exact( [PASS, EOF, CONNECTION_REFUSED, LOGIN_PROMPT, RESET_BY_PEER], timeout=tout )
              except:
-                   status = 10
-                   return( status, command )
+                 status = 10
+                 return( status, command )
+
+             if status == 0 or status == 3:
+                command.sendline(passwd)
+                #print"send pass ", passwd
+                try:
+                    status = command.expect_exact( ['#', USERNAME, pexpect.TIMEOUT], timeout=tout)
+                    if status == 1:
+                        status = 11
+                        return( status, command )
+                    
+                    # Username: prompt appears again
+                    # Could be login through a terminal server
+                    # the 2nd authentication would be needed
+                    elif status == 2:
+                        command.send('\r')
+                        status = command.expect_exact( ['#', USERNAME, pexpect.TIMEOUT], timeout=tout)
+                        if status == 1:
+                            status = 11
+                            return( status, command )
+                        elif status == 2:
+                            status = 10
+                            return( status, command )
+                except:
+                    status = 10
+                    return( status, command )
 
         elif status == 1:
             print "Logging in using telnet", status
@@ -303,9 +322,21 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
                     
         return( status, command )
 
-
 def telnet_logout(session):
     print "Logging out..",
+
+def second_login(host, login, passwd):
+    host.sendline(login)
+    try:
+        status = host.expect([PASS], timeout = tout)
+        host.sendline(passwd)
+        status = host.expect_exact(["#"], timeout = tout)
+
+    except:
+        print host
+        status = 10
+
+    return status
 
 def wait_loop(sec):
      bang = 0
@@ -352,6 +383,9 @@ def command_exec(dline, options):
     else: 
        print bcolors.FAIL +"No such terminal is supported:",term +bcolors.ENDC
        sys.exit(0)
+
+    if auth == 11:
+        auth = second_login(host, options.login2, options.password2)
 
     if auth == 0:
         good_count.append(dline[0])
