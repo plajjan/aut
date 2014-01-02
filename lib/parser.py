@@ -87,6 +87,8 @@ def parsecli():
         default=0, metavar=" ", help="Run only Post-upgrade checks")
     oparser.add_option("--upgrade-only", action="store_const", const=2, dest="upgradeset", default=0,
         metavar=" ", help="do an upgrade without running pre and post upgrade checks")
+    oparser.add_option("--turboboot", action="store_true", dest="turboboot", default=False,
+        metavar=" ", help="execute turboboot (need console login)")
     oparser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
         metavar=" ", help="execute with verbose")
     #oparser.add_option('-z', dest='optimize',action='store_true', default=False,

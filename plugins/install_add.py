@@ -201,6 +201,9 @@ class IPlugin(object):
                 tmp = file_opened.readline()
                 if (len(tmp) == 0):
                     break
+                # skip vm image for turbo boot
+                if tmp.find('.vm-') >= 0:
+                    continue
                 file_list = file_list + " " + str.strip(tmp)
        
             #print file_list 
