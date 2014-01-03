@@ -89,6 +89,8 @@ def parsecli():
         metavar=" ", help="do an upgrade without running pre and post upgrade checks")
     oparser.add_option("--turboboot", action="store_true", dest="turboboot", default=False,
         metavar=" ", help="execute turboboot (need console login)")
+    oparser.add_option("-m", "--mail", dest="mail", default=None, metavar='ADDRESS',
+        help="E-mail address to send a notice of the end of prosessing. e.g.: -m foo@cisco.com.")
     oparser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
         metavar=" ", help="execute with verbose")
     #oparser.add_option('-z', dest='optimize',action='store_true', default=False,

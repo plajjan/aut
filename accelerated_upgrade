@@ -68,6 +68,7 @@ def main():
     device = options.device
     verbose= options.verbose
     pkg_list_file = options.pkg_file
+    mail_address = options.mail
     drange = []
     if login and passwd and dlist and clist or \
        login and passwd and device or \
@@ -133,6 +134,13 @@ def main():
         print "Total host that Connection was refused on %d\n Check Access List" % len(refused_count)
         for line in refused_count:
             print line
+
+    # send a notice of the end of processing when a mail address is given
+    # this needs mail command of UNIX system
+    if mail_address:
+        cmd = "echo 'This is a notice from Accelerated Upgrade utility.' | "
+        cmd += "mail -s 'Acclerated Upgrade completed!' " + mail_address
+        os.system(cmd)
     # Fix dos2unix 
 
 def escalated_priv(cmd, host):
