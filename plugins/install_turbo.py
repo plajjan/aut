@@ -76,6 +76,68 @@ class IPlugin(object):
 
         return vm_image
 
+    # get the standby rp into rommon mode from the active console
+    #
+    # This utility does not have Standby RP console access.
+    # We can shutdown Standby RP from Active RP console but we cannot restart Standby RP.
+    # An operator has to restart Standby RP manually after all processes done
+ 
+    def shutdown_standby_rp(self, host):
+
+        try:
+            # get Standby RP
+            host.sendline('show platform')
+            host.expect('#')
+            lines = host.before.split('\r\n')
+            srp = ''
+            status = -1
+            for line in lines:
+                if line.find('Standby') >= 0:
+                    match = re.search('\d+/(RSP|RP)\d+/CPU\d+', line)
+                    srp = match.group()
+                    status = line.find('IOS XR RUN')
+
+            if srp == '':  # No Standby RP, nothing to do
+                retval = 0
+                return retval
+
+            # check Standby RP state
+
+            if status >= 0:    # Standby RP is in IOS XR RUN state
+                cmd = 'admin config-register 0x0 location ' + srp
+                host.sendline(cmd)
+                host.expect('#')
+
+                cmd = 'admin reload location ' + srp
+                host.sendline(cmd)
+                status = 0
+                while status == 0:
+                    status = host.expect(['confirm','#'])
+                    if status == 0:
+                        host.send('\r')
+
+                print "Standby RP", srp, "has been shut down for Turboboot."
+                print "This script cannot restart Standby RP automatically."
+                print "Please restart Standby RP as follows after all processes done."
+                print "rommon 1> unset BOOT"
+                print "rommon 2> confreg 0x102"
+                print "rommon 3> sync"
+                print "rommon 4> reset"
+  
+            else:
+                print "Stabdby RP is not in IOS XR RUN state."
+                print "You may need to update IOS-XR of Standby RP manually."
+                print "Besides that, this could interrupt the Turboboot process."
+            retval = 0
+
+        except Exception as e:
+            print "## error ##"
+            print e
+            print "#########"
+            retval = -1
+
+        return retval
+
     # set 0x0 to confreg and reload the decice
     def reload(self, host):
         retval = 0
@@ -301,6 +363,12 @@ class IPlugin(object):
             print "#########"
             retval = -1
             return
+
+        # get the standby rp in rommon
+        retval = self.shutdown_standby_rp(host)
+        if retval == -1:
+            print "connot get the standby rp into rommon mode before turboboot."
+            return retval        
 
         # count the number of cards
         retval, card_num, valid_card_num = self.count_valid_cards(host)
