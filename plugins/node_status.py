@@ -82,7 +82,7 @@ class IPlugin(object):
         newstring = host.before.split("\n",50)
         lib.global_constants.srp=self.get_standby_node(host.before.split('\n'))
 
-        valid_state = ['IOS XR RUN', 'PRESENT','READY', 'UNPOWERED', 'FAILED', 'OK']
+        valid_state = ['IOS XR RUN', 'PRESENT','READY', 'UNPOWERED', 'FAILED', 'OK', 'DISABLED']
         try :
             host.expect_exact("#", timeout=30)
         except :

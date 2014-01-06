@@ -213,7 +213,7 @@ class IPlugin(object):
 
     # count the number of cards in valid state
     def count_valid_cards(self, host):
-        valid_state = 'IOS XR RUN|PRESENT|READY|UNPOWERED|FAILED|OK'
+        valid_state = 'IOS XR RUN|PRESENT|READY|UNPOWERED|FAILED|OK|DISABLED'
         retval = 0
 
         try:
