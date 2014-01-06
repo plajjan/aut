@@ -152,13 +152,13 @@ class IPlugin(object):
             # wait for rommon prompt
             # in some cases, multiple confirmations are needed
 
-            status = host.expect(['rommon 1 >', 'confirm'], timeout = 60)
+            status = host.expect(['rommon \w+ >', 'confirm'], timeout = 60)
             if status == 1:
                 host.send('\r')
-                status = host.expect(['rommon 1 >', 'confirm'], timeout = 60)
+                status = host.expect(['rommon \w+ >', 'confirm'], timeout = 60)
             if status == 1:
                 host.send('\r')
-                host.expect(['rommon 1 >'], timeout = 60)
+                host.expect(['rommon \w+ >'], timeout = 60)
 
         except Exception as e:
             print "## error ##"
@@ -171,7 +171,7 @@ class IPlugin(object):
     # execute turbo boot
     def turbo_boot(self, host, repository, vm_image):
         retval = 0
-        PROMPT = 'rommon \d+ >'
+        PROMPT = 'rommon \w+ >'
         boot_cmd = "boot " + repository + vm_image
 
         try:
