@@ -261,11 +261,17 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
         command.sendline()
         sleep(5)
         try:
-            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "ios#"], timeout=tout )
+            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "ios#", "Press RETURN to get started"], timeout=tout )
         except:
             status = 10
             print >>sys.stderr, command.before
             return( status, command )
+
+        if status == 5:
+            command.send('\r')
+            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER,
+"#"], timeout=tout )
+
         if status == 0 :
             # Username: prompt
              command.sendline(login)
