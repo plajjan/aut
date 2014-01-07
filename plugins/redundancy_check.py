@@ -30,8 +30,8 @@ class IPlugin(object):
     This pluging checks Standby state
     """
     plugin_name = "Redundancy Node Check.."
-    plugin_type = "PreUpgrade"
-    version     = "1.0.0"
+    plugin_type = PRE_UPGRADE
+    plugin_version     = "1.0.0"
  
  
     def start(self, **kwargs):
@@ -41,7 +41,6 @@ class IPlugin(object):
         print ""
         print "Pre-upgradge checks..."
         print "Checking Standby RP State..."
-
         try :
             host.expect_exact("#", timeout=1)
         except :

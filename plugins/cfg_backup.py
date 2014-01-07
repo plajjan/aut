@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 # =============================================================================
 # cfg_backup.py  - Plugin to capture(show running)
 # configurations present on the system.
@@ -25,7 +23,8 @@
 # ==============================================================================
 
 
-import re;
+import re
+from lib import aulog
 from time import sleep
 from lib.global_constants import *
 
@@ -36,11 +35,10 @@ class IPlugin(object):
 	This pluging checks and record active packages
 	"""
 	plugin_name = "Configuration backup."
-	plugin_type = "PreUpgrade"
-	version     = "1.0.0"
+	plugin_type = PRE_UPGRADE
+	plugin_version     = "1.0.0"
 
 	def save_configs (self, str, outfile):
-
 		fo = open(outfile, "w");	
 		fo.write(str);
 		fo.close();
@@ -50,21 +48,24 @@ class IPlugin(object):
 
 	def start(self, **kwargs):
                 # Get the session
+                dev_string = kwargs['options'].device.replace(" ","_")
+                CFG_BKP_FILE = ".cfg_bkup." + dev_string
+
                 host = kwargs['session']
-		print "Backing up configurations..."
+		aulog.debug("Backing up configurations in file %s..."%(CFG_BKP_FILE))
                 try :
                    host.expect_exact("#")
                 except:
                    pass
 		# Pass CLI's to box
+                
                 host.sendline("show running")
                 try :
                     status = host.expect_exact( [INVALID_INPUT, MORE, "#", EOF], timeout = tout_cmd)
                 except :
-                    print "Command: Timed out, before considering this as failure"
-                    print "Please check following log file for details\n%s"%(host.logfile)
+                    aulog.debug("Command: Timed out, before considering this as failure")
                     return -1;
-		self.save_configs(host.before, '.configuration_backup_file');
+		self.save_configs(host.before, CFG_BKP_FILE);
 		return 0
         def stop(self):
             """

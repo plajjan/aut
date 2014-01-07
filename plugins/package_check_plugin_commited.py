@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 # =============================================================================
 # package_check_plugin_commited.py  - Plugin to capture 
 # committed packages on the system.
@@ -35,8 +33,8 @@ class IPlugin(object):
 	This pluging checks the packages state
 	"""
 	plugin_name = "Committed Package Check.."
-	plugin_type = "PreUpgrade"
-	version     = "1.0.0"
+	plugin_type = PRE_UPGRADE
+	plugin_version     = "1.0.0"
 
 	def save_packages (self, str, outfile):
 		fo = open(outfile, "w");	

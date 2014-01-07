@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 #==============================================================================
 # parser.py -- parser for accelerated upgrade CLI
 #
@@ -28,8 +26,8 @@ import os
 import commands
 import optparse
 import shutil
-#from   acc_upgrade_constants import bcolors
 from   global_constants import *
+from lib import aulog
 
 """
 Coments diff
@@ -78,7 +76,7 @@ def parsecli():
     oparser.add_option("--pre-upgrade-checks-only", action="store_const", const=1, dest="preupgradeset",
         default=0, metavar=" ", help="Run only Pre-upgrade checks")
     oparser.add_option("--post-upgrade-checks-only", action="store_const", const=3, dest="postupgradeset", 
-        default=0, metavar=" ", help="Run only Post-upgrade checks")
+        default=0, metavar=" ", help="Run only Post-upgrade checks, Note : Plugins which depend on data collected during pre upgrade checks to verify will fail , but execution will not be blocked")
     oparser.add_option("--upgrade-only", action="store_const", const=2, dest="upgradeset", default=0,
         metavar=" ", help="do an upgrade without running pre and post upgrade checks")
     oparser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
@@ -87,42 +85,39 @@ def parsecli():
     #    metavar='Optimize',
     #    help='Optimize to not recreate packages if they exist in Package Repository')
 
-    options, args = oparser.parse_args()
     if len(sys.argv) < 2 : 
         usage()
+        sys.argv.extend("-h")
+    options, args = oparser.parse_args()
+    if len(sys.argv) < 2 :
+        usage()
         sys.exit(-1)
+    check_options(options)
+    
+    return options,args
 
+def check_options(options):
+    status = True
     if not options.login:
         print_failure("Mandatory option 'Login' is missing")
+        status = False
     if not (options.device or options.devices):
         print_failure("Mandatory option 'Device' is missing")
+        status = False
     if not options.password:
         print_failure("Mandatory option 'Password' is missing")
-    if options.postupgradeset or options.upgradeset:
-       pass
-    else:
-      if not options.repository_path:
-         print_failure("Mandatory option 'Repository path' is  missing")
-      if not options.pkg_file:
-         print_failure("Mandatory option 'Package list file' is  missing")
-         sys.exit(-1)
-
+        status = False
+    if not options.repository_path and not options.postupgradeset :
+        print_failure("Mandatory option 'Repository path' is  missing")
+        status = False
+    if not options.pkg_file and not options.postupgradeset :
+        print_failure("Mandatory option 'Package list file' is  missing")
+        status = False
     if options.preupgradeset and options.postupgradeset:
        print_failure("--pre-upgrade-checks-only and --post-upgrade-checks-only options\n"
                      "  are mutually exclusive")
+    if not status :
        sys.exit(-1)
+    return 0
 
-    return options,args
 
-def print_failure(str):
-    print bcolors.FAIL + str + bcolors.ENDC
-#=========================================================================
-# Parsing options
-#=========================================================================
-
-def main():
-    options,args = parsecli()
-    print options.Preupgradeset
-
-if __name__ == "__main__":
-    main()

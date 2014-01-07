@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 #==============================================================================
 # ping_test.py - Plugin for checking reability to tftp.
 #
@@ -36,7 +34,7 @@ class IPlugin(object):
 
     """
     plugin_name    = "Ping Check.."
-    plugin_type    = "PreUpgrade"
+    plugin_type    = PRE_UPGRADE
     plugin_version = "1.0.0"
 
 
@@ -52,16 +50,21 @@ class IPlugin(object):
            return -1 
         try :
             host.expect_exact("#", timeout=30)
+            
         except :
             pass
         pat = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
         ipaddr = re.findall(pat, pkg_path)
         protocol =['tftp:', 'sftp:', 'ftp:']
         list = [' '];
-        list = pkg_path.split('/');
+        list = pkg_path.split('/')
+        if not len(ipaddr) :
+            print >> sys.stderr, "Invalid TFTP address "   
+            return -1
+
         if ( len(list[0]) if list[0] else list[1] in protocol):
-            #cmd="run ping -p 0xf -z 0xa "+ipaddr[0]
             cmd = "ping "+ipaddr[0]
+            aulog.info(cmd)
             host.sendline(cmd)
             try :
                 status = host.expect_exact( [INVALID_INPUT, MORE, "#", PROMPT, EOF], timeout = tout_cmd)
@@ -74,6 +77,7 @@ class IPlugin(object):
         if (out.find('Success rate is 0') != -1 or
             out.find('Bad hostname or protocol not running') != -1 or 
             out.find('UUUUU') != -1):
+            print >> sys.stderr, "TFTP server %s is not reachable from device"%(ipaddr)   
             return -1
         return 0
 

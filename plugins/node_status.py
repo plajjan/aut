@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 #==============================================================
 # node_status.py  - Plugin for checking Node states.
 #
@@ -34,8 +32,8 @@ class IPlugin(object):
     This pluging checks states of all nodes
     """
     plugin_name = "Node Status Check.."
-    plugin_type = "PreUpgrade","PostUpgrade"
-    version     = "1.0.0"
+    plugin_type = PRE_UPGRADE_AND_POST_UPGRADE
+    plugin_version     = "1.0.0"
  
     def get_standby_node(self, cmd_op):
         list=[]
@@ -64,7 +62,6 @@ class IPlugin(object):
         print "     b) PRESENT"
         print "     c) UNPOWERED"
         # Get 'show platform status o/p
-
         try :
             host.expect_exact("#", timeout=30)
         except :

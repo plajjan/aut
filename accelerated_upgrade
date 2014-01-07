@@ -34,12 +34,14 @@ import string
 import pexpect
 import getopt
 import inspect
+import logging
 import threading
 import time
 from time import sleep
 from lib import plugins_manager
 from lib.parser import *
 from lib.global_constants import *
+from lib import aulog
 
 term = "telnet"
 repository = ""
@@ -69,71 +71,35 @@ def main():
     verbose= options.verbose
     pkg_list_file = options.pkg_file
     drange = []
-    if login and passwd and dlist and clist or \
-       login and passwd and device or \
-       login and passwd and dlist or \
-       login and passwd and device and command or \
-       login and passwd and dlist and command or \
-       login and passwd and device and clist or \
-       login and dlist and clist or \
-       login and device and command or \
-       login and dlist and command or \
-       login and device and clist:
-        if dlist:
-            print "file list %s" % dlist
-            device_list = open(dlist, 'r')
-            for line in device_list:
-                line = re.sub("\n$", "", line)
-                drange.append(line)
-            device_list.close()
-        else:
-            drange.append(device)
-        threads = []
-        nloops = range(len(drange))
-        print drange
-        for dline in drange:
-            dline = [dline]
-            print dline
-            after = thread_command(command_exec, (dline, options), command_exec.__name__)
-            threads.append(after)
-        for i in nloops:
-            threads[i].start()
-            sleep(1)
-        for i in nloops:
-            threads[i].join()
-    else:
-        print "="*30," Usage info ","="*30 
-        usage()
-        print "-"*80
 
-    print "Total host that passed %d" % len(good_count)
+    #Either device or device list is needed to operate
+    if dlist:
+        aulog.info("File containing device list : %s" % dlist)
+        if not os.path.exists(dlist):
+            sys.exit("File %s not found"%(dlist))
+        device_list = open(dlist, 'r')
+        for line in device_list:
+            line = re.sub("\n$", "", line)
+            drange.append(line)
+        device_list.close()
+    else:
+        drange.append(device)
+
+    threads = []
+    nloops = range(len(drange))
+    for dline in drange:
+        dline = [dline]
+        after = thread_command(command_exec, (dline, options), command_exec.__name__)
+        threads.append(after)
+    for i in nloops:
+        threads[i].start()
+        sleep(1)
+    for i in nloops:
+        threads[i].join()
+
+    # Report the status of run for all devices
     for line in good_count:
-        print line, "Total elapsed time : %s"%(elapsed_time(line))
-    if len(unknown_count) :
-        print "Total host that failed %d" % len(unknown_count)
-        for line in unknown_count:
-            print line
-    if len(badlp_count) :
-        print "Total host that had either incorrect login or passwords %d" % len(badlp_count)
-        for line in badlp_count:
-            print line
-    if len(timeout_count) :
-        print "Total host that timed out %d" % len(timeout_count)
-        for line in timeout_count:
-            print line
-    if len(reset_count) :
-        print "Total host that were reset by peer or Connection Closed by Peer %d" % len(reset_count)
-        for line in reset_count:
-            print line
-    if len(key_count) :
-        print "Total host that Host Key Verification Failed on %d" % len(key_count)
-        for line in key_count:
-            print line
-    if len(refused_count) :
-        print "Total host that Connection was refused on %d\n Check Access List" % len(refused_count)
-        for line in refused_count:
-            print line
-    # Fix dos2unix 
+        aulog.info(line + "Total elapsed time : %s"%(elapsed_time(line)))
 
 def escalated_priv(cmd, host):
     try:
@@ -240,24 +206,43 @@ def fix_lf_cr(str_in):
     str_out = str_in.replace([0x0d,0x0a],'')
     return str_in
 
+def reachable(host) :
+    resp = re.compile("(?P<packets>\d+) packets transmitted, (?P<recvd>\d+) \w*")
+    cmd = "ping -c 2 %s"%(host)
+    status,output = commands.getstatusoutput(cmd)
+    ping_response = resp.search(output)
+    if int(ping_response.group('recvd')):
+        return True
+    else :
+        return False
 
 def telnet_login(host_list, login, passwd, connect_retry = 1):
     host = host_list[0]
     authorized = False
     status = 0
+
+    # Before startng see if device is reachable 
+    device_address = host.strip()
+    device_address = device_address.split(" ")[0]
+    if device_address :
+        if not reachable(device_address) :
+            aulog.error("Could not reach to device : %s "%(host,))
+
     session = "telnet " + host
     command = pexpect.spawn( session, maxread=MAXREAD, searchwindowsize=WINDOWSIZE  )
     if term == "telnet":
-        #print "Connecting to %s using %s" % ( host, session )
+        aulog.debug("Connecting to %s using %s" % ( host, session ))
         # Initial "CR"
         command.sendline()
-        sleep(5)
+        sleep(3)
         try:
             status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "ios#"], timeout=tout )
         except:
             status = 10
-            print >>sys.stderr, command.before
+            aulog.error( command.before + command.after )
             return( status, command )
+
+        aulog.debug( command.before + command.after )
         if status == 0 :
             # Username: prompt
              command.sendline(login)
@@ -271,11 +256,11 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
                    status=0
                    return( status, command )
              except:
+                   aulog.error( command.before + command.after )
                    status = 10
                    return( status, command )
 
         elif status == 1:
-            print "Logging in using telnet", status
             if status == 0:
                 command.sendline(login)
                 status = command.expect_exact( [PASS, EOF], timeout=tout )
@@ -283,7 +268,9 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
                 if status == 0:
                     command.sendline(passwd)
                     status = command.expect_exact( [USERNAME, PASS, PERMISSION_DENIED, LOGIN_PROMPT, EOF], timeout=tout )
-                    print "Logged int ...."
+                    print "Logged in ...."
+            elif not command.isalive():
+                aulog.error("Connection refused..")
             elif status == 1:
                 command.sendline(passwd)
                 status = command.expect( [USERNAME, PASS, PERMISSION_DENIED, LOGIN_PROMPT, EOF], timeout=tout )
@@ -322,22 +309,18 @@ def wait_loop(sec):
 def command_exec(dline, options):
     kwargs = {}
     auth = 0
-    save = 1
     cur_time = time.strftime("%d%m%Y%H%M%S", time.gmtime())
 
-    if save:
-        if dline[0] :
-            s_out = str(dline[0]).replace(" ",'_')
-        elif dline[0][0] : 
-            s_out = str(dline[0][0]).replace(" ",'_')
-        if os.path.exists(s_out+'.txt'):
-             os.system("mv %s.txt %s.txt.%s"%(s_out,s_out,cur_time))
-        start_time[str(s_out)] = time.time()
-        try:
-            save_out = file(s_out+'.txt', "w")
-        except:
-            save_out = file(s_out+'.txt', "w")
-
+    if dline[0] :
+        s_out = str(dline[0]).replace(" ",'_')+".txt"
+    elif dline[0][0] : 
+        s_out = str(dline[0][0]).replace(" ",'_')+".txt"
+    if os.path.exists(s_out+'.txt'):
+         os.system("mv %s.txt %s.txt.%s"%(s_out,s_out,cur_time))
+    logfile = s_out
+    start_time[str(s_out)] = time.time()
+   
+    aulogger = aulog.initialize_logging(s_out)
     if term == "ssh":
         auth, host = ssh_login( dline )
     elif term == "telnet":
@@ -361,8 +344,7 @@ def command_exec(dline, options):
             command_list = command
         if not host:
            sys.exit("Connection refused..!")
-        if save:
-            host.logfile=save_out
+
         #=======================================
         # log succeed, go ahead  and start 
         # plugin manager
@@ -436,8 +418,8 @@ def command_exec(dline, options):
         else:
            pass
                             
-        if save:
-            save_out.close()
+        aulog.end_logging("Execution complete")
+
     elif auth == 10:
         print "TIMED OUT, could not connect to %s" % dline[0]
         timeout_count.append(dline[0])
@@ -458,6 +440,7 @@ def command_exec(dline, options):
         unknown_count.append(dline[0])
 
     try:
+       aulog.debug("********  Exiting ********")
        host.sendline('quit')
        sleep(1)
        host.sendline('exit')
@@ -465,14 +448,13 @@ def command_exec(dline, options):
     except:
        pass 
 
-    print >>sys.stderr, "_"*80
-
 class thread_command(threading.Thread):
   def __init__(self, func, args, name=''):
       threading.Thread.__init__( self )
       self.name = name
       self.func = func
       self.args = args
+
   def run(self):
       apply(self.func, self.args)
             
@@ -530,5 +512,9 @@ def blast_plugins(host, options):
 if __name__ == '__main__':
     if os.path.exists("plugins"):
         sys.path.insert(0,os.path.abspath("plugins"))
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit("Exiting due to keyboard interupt")
+
 

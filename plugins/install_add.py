@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 # =============================================================================
 # install_add.py - plugin for adding packages
 #
@@ -52,7 +50,7 @@ class IPlugin(object):
     1.one argument of type dictionary
     """
     plugin_name     = "Install Add"
-    plugin_type     = "PreUpgrade","Upgrade"
+    plugin_type     = PRE_UPGRADE_AND_UPGRADE
     plugin_version  = "1.0.0"
     
     def watch_operation(self):
@@ -210,7 +208,7 @@ class IPlugin(object):
             #cpat = re.compile(pat)
 
             cmd = "admin install add source %s %s"%(repo_str,file_list)
-        
+            aulog.info(cmd) 
             #expecting terminal
 #            try:
 #                self.command_exec.expect(['#'],timeout=60,searchwindowsize=1000)

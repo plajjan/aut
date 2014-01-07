@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 # =============================================================================
 # cmd_snapshot_backup.py - Plugin for taking command backups.
 #
@@ -37,8 +35,8 @@ class IPlugin(object):
 	This pluging collects all CLI provided in file 
 	"""
 	plugin_name = "Backup CLI snapshots.."
-	plugin_type = "PreUpgrade"
-	version     = "1.0.0"
+	plugin_type = PRE_UPGRADE
+	plugin_version     = "1.0.0"
 
 	def save_packages (self, str, outfile):
 		fo = open(outfile, "a");	
@@ -53,11 +51,14 @@ class IPlugin(object):
                 host = kwargs['session']
                 clis = kwargs['cmd_file']
                 if (not clis):
-                    print bcolors.WARNING + "Input file missing(-c option): plugins expects file having list of CLI's to dump, Ignoring"+ bcolors.ENDC
+                    aulog.info(bcolors.WARNING + 
+                        """Input file missing(-c option): 
+                           plugins expects file having list of CLI's to dump,
+                           Ignoring"""+ bcolors.ENDC)
                     return 0 
 
                 fo = open('.CLI_backups', "w")
-                print "The cli file provided is ", clis
+                aulog.info("The cli file provided is ", clis)
                 cli = open(clis, "r"); 
                 for cmd in cli:
                    if (len(cmd.strip()) == 0):
@@ -79,11 +80,10 @@ class IPlugin(object):
                        status = host.expect_exact( [INVALID_INPUT, MORE,"#",INVALID,'\'^\'',  EOF], timeout = tout_cmd)
                        #print "Success", status
                       except :
-			 print "hahahaha"
                          pass
                       #print host.before,status
                       if status == 3 or status == 0 or status == 4:
-                         print "Couldn't get %s(probably feature not enabled) "%(cmd.strip('\n'))
+                         aulog.info("Couldn't get %s(probably feature not enabled) "%(cmd.strip('\n')))
                       else:
                          sleep(2)
                          str="++++++++"+cmd.strip('\n')+"++++++++\n#"

@@ -1,37 +1,11 @@
-#!/router/bin/python-2.7.4
-
-# ==============================================================================
-# install_act.py - plugin for activating packages 
-#
-# Copyright (c)  2013, Cisco Systems
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without modification,
-# are permitted provided that the following conditions are met:
-#
-# Redistributions of source code must retain the above copyright notice,
-# this list of conditions and the following disclaimer.
-# Redistributions in binary form must reproduce the above copyright notice, this list of conditions
-# and the following disclaimer in the documentation and/or other materials provided with the distribution.
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS
-# OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
-# AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
-# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-# OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-# OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# ==============================================================================
-
 import re
 import sys
 import commands
 from time import *
 import pexpect
 from sys import stdout
-import lib.global_constants
 from lib.global_constants import *
-
+import lib.pkg_utils
 
 #few macros/constants used in the code
 XML_ADD_RESPONSE_FILE   = "/tmp/accel_upgrade_add_response.xml"
@@ -39,8 +13,7 @@ LOG_FILE                = "/tmp/acc_log.txt"
 ERROR_LOG_FILE          = "/tmp/acc_err_log.txt"
 XML_ACT_FILE            = "/tmp/accel_upgrade_act.xml"
 XML_ACT_RESPONSE_FILE   = "/tmp/accel_upgrade_act_response.xml"
-RELOAD_MEG  = "Info:     Install Method: Parallel Reload"
-RESTART_MSG = "Info:     Install Method: Parallel Process Restart"
+pkgutils = lib.pkg_utils
 
 class IPlugin:
     """
@@ -51,14 +24,14 @@ class IPlugin:
     1.options
     """
     plugin_name = "Install Act"
-    plugin_type = "Upgrade"
-    version     = "1.0.0"
+    plugin_type = UPGRADE
+    plugin_version = "1.0.0"
 
     def watch_operation(self):
         """
         function to keep watch on progress of operation
         """
-        retval = SYSTEM_RELOADED 
+        retval = SYSTEM_RELOADED
         chars = '\\'
         pat = r'There are no install requests in operation'
         cpat = re.compile(pat)
@@ -90,7 +63,6 @@ class IPlugin:
                     match_str = re.findall(cpat1,txt)
                     if match_str:
                         display_string = display_string + str.strip(str(match_str[0]))
- 
                     res = count % 4
                     if (res == 0):
                         chars = "|"
@@ -127,6 +99,8 @@ class IPlugin:
         self.command_exec.sendline(cmd)
         try:
             index = self.command_exec.expect(['successfully','failed'],searchwindowsize=1000,timeout=30)
+            aulog.info(self.command_exec.after)
+            aulog.info(self.command_exec.before)
             if ((index == 1)):
                 self.error_log_file.write("install act failed\n")
                 retval = -1
@@ -134,8 +108,7 @@ class IPlugin:
                 act_id = open(XML_ADD_RESPONSE_FILE,"w")
                 act_id.write(self.id)
                 act_id.close()
-                retval = self.get_install_impact()
-   
+  
         except pexpect.EOF:
             self.error_log_file.write("EOF encountered when expecting for other input\n")
             self.error_log_file.write("ERROR:cannot parse show install log detail output\n")
@@ -143,29 +116,60 @@ class IPlugin:
         except pexpect.TIMEOUT:
             self.error_log_file.write("TIMEOUT encountered when expecting for other input\n")
             self.error_log_file.write("ERROR:cannot parse show install log detail output\n")
-            retval = SYSTEM_RELOADED 
+            retval = SYSTEM_RELOADED
 
         return int(retval)
 
-    def get_install_impact(self):
-        cmd = "admin show install log %d"%(int(self.id))
-        self.command_exec.sendline(cmd)
-        try:
-            index = self.command_exec.expect([RELOAD_MSG, RESTART_MSG],searchwindowsize=1000,timeout=30)
-            if ((index == 1)):
-                return INSTALL_METHOD_PROCESS_RESTART
-            elif (index == 0):
-                return SYSTEM_RELOADED
-        except : 
-            # Optimist expectation
-            return INSTALL_METHOD_PROCESS_RESTART
+
+
 
     def install_getID(self):
         """
         get the install id of add operation
         """
-        self.id = int(lib.global_constants.add_id)
-    
+        self.id = -1
+
+    def get_active_pkgs(self):
+
+        self.command_exec.sendline()
+        sleep(5)
+        status = self.command_exec.expect_exact( [INVALID_INPUT,"#", MORE, PROMPT, EOF],
+               timeout = 10)
+        self.command_exec.sendline("admin show install active summary")
+        sleep(5)
+        try :
+           status = self.command_exec.expect_exact( [INVALID_INPUT,"#", MORE, PROMPT, EOF],
+               timeout = 10)
+        except :
+           return None
+        return self.command_exec.before
+
+    def get_inactive_pkgs(self):
+
+        self.command_exec.sendline()
+        sleep(5)
+        status = self.command_exec.expect_exact( [INVALID_INPUT,"#", MORE, PROMPT, EOF],
+               timeout = 10)
+        self.command_exec.sendline("admin show install inactive summary")
+        sleep(5)
+        try :
+           status = self.command_exec.expect_exact( [INVALID_INPUT,"#", MORE, PROMPT, EOF],
+               timeout = 10)
+        except :
+           return None
+        return self.command_exec.before
+
+    def get_tobe_activated_pkglist(self,kwargs):
+        pkg_list = kwargs['pkg-file-list']
+        added_pkgs = pkgutils.NewPackage(pkg_list)
+        inactive_pkgs = self.get_inactive_pkgs()
+        active_pkgs = self.get_active_pkgs()
+        inactive_pkgs = pkgutils.OnboxPackage(inactive_pkgs,"inactive")  
+        active_pkgs = pkgutils.OnboxPackage(active_pkgs,"install active")  
+        pkg_to_activate  = pkgutils.pkg_tobe_activated(added_pkgs.pkg_list,inactive_pkgs.pkg_list,active_pkgs.pkg_list)
+        return " ".join(pkg_to_activate)
+
+
     def install_act(self,kwargs):
         """
         it performs activate operation
@@ -175,17 +179,20 @@ class IPlugin:
         #get install operation ID of add operation which
         #added packages to be executed
         self.install_getID()
-        if (self.id == -1):
-            error_log_file.write("failed in getting install operation ID\n")
-            retval = -1
-        
-        if (retval == 0):
+        if (self.id > 0) :
+            self.get_pkg_list()
             #log the activity
             log_msg = "install operation ID to be executed is %d\n"%(self.id)
             self.log_file.write(log_msg)
-
-        cmd = " admin install activate id %d prompt-level none"%(int(self.id))
-
+            cmd = " admin install activate id %d prompt-level none"%(int(self.id))
+        else :
+            tobe_activated = self.get_tobe_activated_pkglist(kwargs)
+            if not tobe_activated :
+                print >>sys.stderr, """
+                Package list is empty or all package are not in inactive state"""
+                return -1
+            cmd = " admin install activate %s prompt-level none"%(tobe_activated)
+        aulog.info(cmd)
         number = r'\d+'
         cnumber = re.compile(number)
         sleep(2)
@@ -195,7 +202,7 @@ class IPlugin:
         except Exception,e:
             self.error_log_file.write("ERROR:failed when expecting # before doing act operation\n")
             output = str(type(e))
-            self.error_log_file.write(output + "\n") 
+            self.error_log_file.write(output + "\n")
 
 
         self.command_exec.sendline(cmd)
@@ -255,4 +262,4 @@ class IPlugin:
         pass
 
 
-#ActPlugin().start()
+

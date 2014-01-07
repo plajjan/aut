@@ -52,6 +52,7 @@ USERNAME = "Username: "
 PRIVALEGE = re.compile(r"^\benable\b|^\ben\b|^\bsu\b")
 MORE = "--more--|--More--|^\!"
 EOF = pexpect.EOF
+aulogger = None
 tout = 10
 ## to cope with different platform putting this max
 tout_cmd = 180 
@@ -80,11 +81,43 @@ class bcolors:
         self.FAIL = ''
         self.ENDC = ''
 
-def print_failure(str):
-    print bcolors.FAIL + str + bcolors.ENDC
-def print_warning(str):
-    print bcolors.WARNING + str + bcolors.ENDC
-def print_success(str):
-    print bcolors.OKGREEN + str + bcolors.ENDC
+class Term:
+    BLUE = '\033[96m'
+    GREEN = '\033[92m'
+    MAGENTA = '\033[93m'
+    RED = '\033[91m'
+    NORMAL = '\033[0m'
+    def initalize(self):
+        self.BLUE= ''
+        self.GREEN= ''
+        self.MAGENTA= ''
+        self.RED = ''
+        self.NORMAL = ''
 
-#print bcolors.OKGREEN + "Text" + bcolors.ENDC
+term = Term()
+
+from lib import aulog
+def print_failure(str):
+    aulog.error(str)
+
+def print_warning(str):
+    aulog.warning(str)
+
+def print_success(str):
+    aulog.info(str)
+
+# Plugin types
+UPGRADE              = "UPGRADE"
+PRE_UPGRADE          = "PRE_UPGRADE"
+POST_UPGRADE         = "POST_UPGRADE"
+PRE_UPGRADE_AND_POST_UPGRADE = "PRE_UPGRADE_AND_POST_UPGRADE"
+PRE_UPGRADE_AND_UPGRADE = "PRE_UPGRADE_AND_UPGRADE"
+UPGRADE_AND_POST_UPGRADE = "UPGRADE_AND_POST_UPGRADE"
+
+supported_plugin_types = [
+    PRE_UPGRADE,
+    POST_UPGRADE,
+    PRE_UPGRADE_AND_POST_UPGRADE,
+    PRE_UPGRADE_AND_UPGRADE,
+    UPGRADE_AND_POST_UPGRADE
+]

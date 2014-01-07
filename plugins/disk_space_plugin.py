@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 #==============================================================================
 # disk_space_plugin.py - Plugin for checking available disk space.
 #
@@ -28,6 +26,7 @@ import re;
 import pexpect
 from lib.global_constants import *
 from time import sleep
+import os
 
 def get_pie_size(host, path, line):
           size = 0
@@ -37,7 +36,8 @@ def get_pie_size(host, path, line):
           except:
               pass
 
-          cmd = "admin show install pie-info "+path+line
+          cmd = "admin show install pie-info "+ os.path.join(path,line)
+          aulog.info(cmd)
           host.sendline(cmd)
           try :
              status = host.expect( [INVALID_INPUT, "Error:    Failed to verify pie file",
@@ -57,6 +57,7 @@ def get_pie_size(host, path, line):
 
           if status != 2: 
              print bcolors.WARNING + line.strip('\n'),"Package not found in repository ",path + bcolors.ENDC
+             print host.before + host.after
 
           try :
               host.expect_exact("#")
@@ -86,8 +87,8 @@ class IPlugin(object):
     This pluging checks the available disk space
     """
     plugin_name = "Disk Space check.."
-    plugin_type = "PreUpgrade"
-    version     = "1.0.0"
+    plugin_type = PRE_UPGRADE
+    plugin_version     = "1.0.0"
 
 
     def start(self, **kwargs):
@@ -139,7 +140,7 @@ class IPlugin(object):
         total_req_size = 0
         try :
             for line in fd:
-                total_req_size = total_req_size + get_pie_size(host, pkg_path, line)
+                total_req_size = total_req_size + get_pie_size(host, pkg_path, line.strip())
                 sleep(10)
         except: 
            print bcolors.WARNING + "Pkg not found or Repository is not rechable couldn't get size of packages"

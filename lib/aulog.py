@@ -5,9 +5,7 @@ import time
 import os
 import shutil
 import glob
-
-
-
+from global_constants import *
 
 # Implements the functions for logging and error messaging from AU.
 # Its completely based upon python logging module.
@@ -41,7 +39,7 @@ au_logger      = None
 
 # print colored messages if the output goes to a termianl.
 # if we are writing to a file its just normal.
-term = None
+
 
 def initialize_logging(logfile=AULOG, verbose=DEBUG, cmd=sys.argv, color=True, logger_name=None):
     """ Function to intialize logging for AU. 
@@ -53,14 +51,7 @@ def initialize_logging(logfile=AULOG, verbose=DEBUG, cmd=sys.argv, color=True, l
     if au_logger is not None:
         debug("Ignoring re-initialize the logging %s" % cmd)
         return
-
-    # we will have only two logging levels. with -v option we log all messages
-    # without -v option, we dont log debugging messages.
-    if verbose or os.environ.get(auenv.AU_DEBUG):
-        s_level = DEBUG
-    else:   
-        s_level = INFO
-
+    s_level = DEBUG
     LEVELS = { 
               DEBUG    : logging.DEBUG,
               INFO     : logging.INFO,
@@ -77,7 +68,8 @@ def initialize_logging(logfile=AULOG, verbose=DEBUG, cmd=sys.argv, color=True, l
         logger_name=get_auid()
 
     level = LEVELS[s_level]
-    logging.basicConfig(filename=logfile,level=level)
+    #logging.basicConfig(format='%(asctime)s:%(message)s',filename=logfile,level=level)
+    logging.basicConfig(format=':%(message)s',filename=logfile,level=level)
     au_logger  = logging.getLogger(logger_name)
 
     if au_logger and cmd:
@@ -90,7 +82,8 @@ def end_logging(msg):
 
     info("Execution time: %s secs"%(elapsed_time()))
     marker = "--------------------- End of execution ------------------------\n"
-    au_logger.info("\n" + marker + marker )
+    if au_logger :
+        au_logger.info("\n" + marker + marker )
 
 
 
@@ -149,12 +142,14 @@ def error(str):
     """ AU Error, makes the au to exit. """
 
     errmsg = "ERROR: %s\n" % (str)
-    if term:
-        print >> sys.stderr, term.RED + errmsg + term.NORMAL
-    else:
-        print >> sys.stderr, str
+    print >> sys.stderr, term.RED + errmsg + term.NORMAL
 
     if au_logger is not None:
+        errmsg.replace('\033[96m',' ')
+        errmsg.replace('\033[92m',' ')
+        errmsg.replace('\033[93m',' ')
+        errmsg.replace('\033[91m',' ')
+        errmsg.replace('\033[0m',' ')
         au_logger.error(str)
 
     end_logging("Failed: %s" % (str))
@@ -179,12 +174,14 @@ def info(infomsg, color=None):
     """ info messages, messages that goes to STDOUT and au.log depending
         upon the logging """
 
-    if term and color:
-        print getattr(term, color) + infomsg + term.NORMAL
-    else:
-        print infomsg
-
+    print >> sys.stdout, infomsg
     if au_logger is not None:
+        # Strip colour info from logfile
+        infomsg.replace('\033[96m',' ')
+        infomsg.replace('\033[92m',' ')
+        infomsg.replace('\033[93m',' ')
+        infomsg.replace('\033[91m',' ')
+        infomsg.replace('\033[0m',' ')
         au_logger.info(infomsg)
 
 
@@ -193,6 +190,11 @@ def debug(debugmsg):
         except logging is not enabled. """
 
     if au_logger is not None:
+        debugmsg.replace('\033[96m',' ')
+        debugmsg.replace('\033[92m',' ')
+        debugmsg.replace('\033[93m',' ')
+        debugmsg.replace('\033[91m',' ')
+        debugmsg.replace('\033[0m',' ')
         au_logger.debug(debugmsg)
     else:
         print "DEBUG: %s" % debugmsg
@@ -237,12 +239,10 @@ def save(logname, savedir=SAVEDLOGDIR):
 
     backup_link_name = os.path.join(".%s.%s" % (os.path.basename(logname), get_auid()))
     backup_link = os.path.join(savedir, backup_link_name)
-    debug("logname %s backup link %s " % (logname, backup_link))
 
     # Now set the symlink
     try:
         os.symlink(logname, backup_link)
-        debug("Created symlink %s -> %s" % (backup_link, logname))
     except OSError:
         warning("%s -> %s: cannot create the symlink" % (backup_link, logname), 
                             auerror.FILE_IO_ERROR)
@@ -283,7 +283,6 @@ if __name__ == "__main__":
     print "Start"
     initialize_logging('thislog')
     internal_error("Internal error str")
-    #error("Fatal error str")
     warning("Warning str")
     info("This is infomsg")
     debug("This is debug debugmsg")
@@ -291,5 +290,6 @@ if __name__ == "__main__":
     print elapsed_time()
     print get_auid()
     print "Test Pass"
+    error("Fatal error str")
     end_logging("msg")
 

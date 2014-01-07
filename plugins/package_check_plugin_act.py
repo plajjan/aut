@@ -1,5 +1,3 @@
-#!/router/bin/python-2.7.4
-
 #==============================================================================
 # package_check_plugin_act.py - plugin for saving active packages
 # from target system 
@@ -36,9 +34,9 @@ class IPlugin(object):
 	Pre-upgrade check
 	This pluging checks and record active packages
 	"""
-	plugin_name = "Active Packages Check.."
-	plugin_type = "PreUpgrade"
-	version     = "1.0.0"
+	plugin_name = "Packages Check.."
+	plugin_type = PRE_UPGRADE
+	plugin_version     = "1.0.0"
 
 	def save_packages (self, str, outfile):
 		fo = open(outfile, "w");	
