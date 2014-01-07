@@ -49,8 +49,14 @@ def parsecli():
     oparser.add_option("-l", "--login", dest="login", default=None, metavar='LOGIN',
         help="User name to login to the device. e.g.: -l admin.")
 
+    oparser.add_option("-L", "--login2", dest="login2", default=None, metavar='LOGIN2',
+        help="User name to 2nd login to the device. e.g.: -L admin.")
+
     oparser.add_option("-p", "--passwd", dest="password", default=None, metavar='PASSWORD', 
         help="Login password for the device. e.g.: -p passwd'.")
+
+    oparser.add_option("-P", "--passwd2", dest="password2", default=None, metavar='PASSWORD2', 
+        help="2nd Login password for the device. e.g.: -P passwd'.")
 
     oparser.add_option("-T", "--tunnel", dest="tunnel", default=None, metavar="'NAME'",
         help="List of inetremediate serevers to reach the device. e.g.: -T server-1,server-2")
@@ -79,6 +85,10 @@ def parsecli():
         default=0, metavar=" ", help="Run only Post-upgrade checks, Note : Plugins which depend on data collected during pre upgrade checks to verify will fail , but execution will not be blocked")
     oparser.add_option("--upgrade-only", action="store_const", const=2, dest="upgradeset", default=0,
         metavar=" ", help="do an upgrade without running pre and post upgrade checks")
+    oparser.add_option("--turboboot", action="store_true", dest="turboboot", default=False,
+        metavar=" ", help="execute turboboot (need console login)")
+    oparser.add_option("-m", "--mail", dest="mail", default=None, metavar='ADDRESS',
+        help="E-mail address to send a notice of the end of prosessing. e.g.: -m foo@cisco.com.")
     oparser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
         metavar=" ", help="execute with verbose")
     #oparser.add_option('-z', dest='optimize',action='store_true', default=False,

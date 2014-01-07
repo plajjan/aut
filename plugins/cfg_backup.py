@@ -47,6 +47,8 @@ class IPlugin(object):
 
 
 	def start(self, **kwargs):
+                MORE = '--more--|--More--'
+
                 # Get the session
                 dev_string = kwargs['options'].device.replace(" ","_")
                 CFG_BKP_FILE = ".cfg_bkup." + dev_string
@@ -54,18 +56,49 @@ class IPlugin(object):
                 host = kwargs['session']
 		aulog.debug("Backing up configurations in file %s..."%(CFG_BKP_FILE))
                 try :
-                   host.expect_exact("#")
+                   host.expect_exact("#", timeout = 15)
                 except:
                    pass
-		# Pass CLI's to box
-                
-                host.sendline("show running")
-                try :
-                    status = host.expect_exact( [INVALID_INPUT, MORE, "#", EOF], timeout = tout_cmd)
+                try: 
+                    # Set terminal length
+                    host.sendline("terminal length 500")
+                    host.expect_exact("#")
+
+	    	    # Pass CLI's to box
+                    host.sendline("show running")
+
+                    while 1:
+                        status = host.expect( [INVALID_INPUT, MORE, '\nend\r', EOF], timeout = tout_cmd)
+		        self.save_configs(host.before, '.configuration_backup_file')
+                        # match more
+                        if status == 1:
+                            host.send(" ")
+                            continue
+                        # match end
+                        elif status == 2:
+                            self.save_configs(host.after, '.configuration_backup_file')
+                            break
+                        else:
+                            print "Unxpected statements"
+                            print "Please check following log file for details\n%s"%(host.logfile)
+                            return -1
+                    # end of while
+
+                    status = host.expect_exact( "#", timeout = tout_cmd)
+
                 except :
                     aulog.debug("Command: Timed out, before considering this as failure")
-                    return -1;
-		self.save_configs(host.before, CFG_BKP_FILE);
+                    return -1
+
+                # reset terminal length
+                host.sendline("terminal length 0")
+                try: 
+                    host.expect_exact("#")
+                except :
+                    print "Command: Timed out, before considering this as failure"
+                    print "Please check following log file for details\n%s"%(host.logfile)
+                    return -1
+
 		return 0
         def stop(self):
             """

@@ -70,6 +70,7 @@ def main():
     device = options.device
     verbose= options.verbose
     pkg_list_file = options.pkg_file
+    mail_address = options.mail
     drange = []
 
     #Either device or device list is needed to operate
@@ -100,6 +101,37 @@ def main():
     # Report the status of run for all devices
     for line in good_count:
         aulog.info(line + "Total elapsed time : %s"%(elapsed_time(line)))
+    if len(unknown_count) :
+        print "Total host that failed %d" % len(unknown_count)
+        for line in unknown_count:
+            print line
+    if len(badlp_count) :
+        print "Total host that had either incorrect login or passwords %d" % len(badlp_count)
+        for line in badlp_count:
+            print line
+    if len(timeout_count) :
+        print "Total host that timed out %d" % len(timeout_count)
+        for line in timeout_count:
+            print line
+    if len(reset_count) :
+        print "Total host that were reset by peer or Connection Closed by Peer %d" % len(reset_count)
+        for line in reset_count:
+            print line
+    if len(key_count) :
+        print "Total host that Host Key Verification Failed on %d" % len(key_count)
+        for line in key_count:
+            print line
+    if len(refused_count) :
+        print "Total host that Connection was refused on %d\n Check Access List" % len(refused_count)
+        for line in refused_count:
+            print line
+
+    # send a notice of the end of processing when a mail address is given
+    # this needs mail command of UNIX system
+    if mail_address:
+        cmd = "echo 'This is a notice from Accelerated Upgrade utility.' | "
+        cmd += "mail -s 'Acclerated Upgrade completed!' " + mail_address
+        os.system(cmd)
 
 def escalated_priv(cmd, host):
     try:
@@ -125,6 +157,7 @@ def escalated_priv(cmd, host):
         elif status == 1:
             status = 0
     return( status, host )
+
 def ssh_login( host ):
     host = host[0]
     authorized = False
@@ -236,29 +269,52 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
         command.sendline()
         sleep(3)
         try:
-            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "ios#"], timeout=tout )
+            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "ios#", "Press RETURN to get started"], timeout=tout )
         except:
             status = 10
             aulog.error( command.before + command.after )
             return( status, command )
 
         aulog.debug( command.before + command.after )
+        if status == 5:
+            command.send('\r')
+            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "#"], timeout=tout )
+
         if status == 0 :
             # Username: prompt
              command.sendline(login)
              #print "Sending login", login,status,command.before,command.after
              try:
-                status = command.expect_exact( [PASS, EOF, CONNECTION_REFUSED, LOGIN_PROMPT, RESET_BY_PEER], timeout=tout )
-                if status == 0 or status == 3:
-                   command.sendline(passwd)
-                   #print"send pass ", passwd
-                   status = command.expect_exact( ['#'],timeout=tout)
-                   status=0
-                   return( status, command )
+                 status = command.expect_exact( [PASS, EOF, CONNECTION_REFUSED, LOGIN_PROMPT, RESET_BY_PEER], timeout=tout )
              except:
-                   aulog.error( command.before + command.after )
-                   status = 10
-                   return( status, command )
+                 aulog.error( command.before + command.after )
+                 status = 10
+                 return( status, command )
+
+             if status == 0 or status == 3:
+                command.sendline(passwd)
+                #print"send pass ", passwd
+                try:
+                    status = command.expect_exact( ['#', USERNAME, pexpect.TIMEOUT], timeout=tout)
+                    if status == 1:
+                        status = 11
+                        return( status, command )
+                    
+                    # Username: prompt appears again
+                    # Could be login through a terminal server
+                    # the 2nd authentication would be needed
+                    elif status == 2:
+                        command.send('\r')
+                        status = command.expect_exact( ['#', USERNAME, pexpect.TIMEOUT], timeout=tout)
+                        if status == 1:
+                            status = 11
+                            return( status, command )
+                        elif status == 2:
+                            status = 10
+                            return( status, command )
+                except:
+                    status = 10
+                    return( status, command )
 
         elif status == 1:
             if status == 0:
@@ -290,9 +346,21 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
                     
         return( status, command )
 
-
 def telnet_logout(session):
     print "Logging out..",
+
+def second_login(host, login, passwd):
+    host.sendline(login)
+    try:
+        status = host.expect([PASS], timeout = tout)
+        host.sendline(passwd)
+        status = host.expect_exact(["#"], timeout = tout)
+
+    except:
+        print host
+        status = 10
+
+    return status
 
 def wait_loop(sec):
      bang = 0
@@ -335,6 +403,9 @@ def command_exec(dline, options):
     else: 
        print bcolors.FAIL +"No such terminal is supported:",term +bcolors.ENDC
        sys.exit(0)
+
+    if auth == 11:
+        auth = second_login(host, options.login2, options.password2)
 
     if auth == 0:
         good_count.append(dline[0])
@@ -485,7 +556,12 @@ def elapsed_time(device):
 def blast_plugins(host, options):
         kwargs = {}
         kwargs['session']  =  host
-        kwargs['repository'] = options.repository_path
+
+        if options.repository_path.endswith("/"):
+            kwargs['repository'] = options.repository_path
+        else:
+            kwargs['repository'] = options.repository_path + "/"
+
         kwargs['pkg-file-list'] = options.pkg_file
         kwargs['cmd_file'] = options.cli_file
         kwargs['options'] = options

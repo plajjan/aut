@@ -45,6 +45,7 @@ plugins_list = [
    "plugins/redundancy_check.py",
    "plugins/cfg_backup.py",
    "plugins/cmd_snapshot_backup.py",
+   "plugins/install_turbo.py",
    "plugins/install_add.py",
 #### Upgrade plugins #### 
    "plugins/install_act.py"
