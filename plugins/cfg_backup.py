@@ -68,7 +68,7 @@ class IPlugin(object):
                     host.sendline("show running")
 
                     while 1:
-                        status = host.expect( [INVALID_INPUT, MORE, '\nend\r', EOF], timeout = tout_cmd)
+                        status = host.expect_exact( [INVALID_INPUT, MORE, "end\r\n", EOF], timeout = tout_cmd)
 		        self.save_configs(host.before, '.configuration_backup_file')
                         # match more
                         if status == 1:
@@ -87,6 +87,7 @@ class IPlugin(object):
                     status = host.expect_exact( "#", timeout = tout_cmd)
 
                 except :
+		    aulog.debug(host.before)
                     aulog.debug("Command: Timed out, before considering this as failure")
                     return -1
 
@@ -95,8 +96,8 @@ class IPlugin(object):
                 try: 
                     host.expect_exact("#")
                 except :
-                    print "Command: Timed out, before considering this as failure"
-                    print "Please check following log file for details\n%s"%(host.logfile)
+		    aulog.debug(host.before)
+                    aulog.debug("Command: Timed out, before considering this as failure")
                     return -1
 
 		return 0

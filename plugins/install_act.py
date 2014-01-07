@@ -188,8 +188,8 @@ class IPlugin:
         else :
             tobe_activated = self.get_tobe_activated_pkglist(kwargs)
             if not tobe_activated :
-                print >>sys.stderr, """
-                Package list is empty or all package are not in inactive state"""
+                aulog.error( """
+                Package list is empty or all package are not in inactive state""")
                 return -1
             cmd = " admin install activate %s prompt-level none"%(tobe_activated)
         aulog.info(cmd)

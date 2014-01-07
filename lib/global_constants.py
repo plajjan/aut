@@ -53,7 +53,7 @@ PRIVALEGE = re.compile(r"^\benable\b|^\ben\b|^\bsu\b")
 MORE = "--more--|--More--|^\!"
 EOF = pexpect.EOF
 aulogger = None
-tout = 10
+tout = 20
 ## to cope with different platform putting this max
 tout_cmd = 180 
 term = "both"
