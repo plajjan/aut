@@ -176,7 +176,7 @@ class PluginsManager(object):
 
     def check_and_run(self, ptype, option):
     
-        # upported_plugin_types is defined in global_constants
+        # supported_plugin_types is defined in global_constants
         if option.preupgradeset:
            if ptype == PRE_UPGRADE or ptype == PRE_UPGRADE_AND_POST_UPGRADE:
               return 0
@@ -198,7 +198,7 @@ class PluginsManager(object):
                return 1
         p=ptype[0]
         if len(p)> 1:
-           if upported_plugin_types.find(ptype[0]) == -1:
+           if p in supported_plugin_types:
               return 1 
         else:
             p=ptype
