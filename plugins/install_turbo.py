@@ -56,7 +56,7 @@ class IPlugin(object):
 
         status = os.path.exists(pkg_list)
         if not status:
-            print "FATAL ERROR:pkg-file-list not exists"
+            aulog.error("FATAL ERROR:pkg-file-list not exists")
             return None
 
         file = open(pkg_list, 'r')
@@ -69,9 +69,9 @@ class IPlugin(object):
                 vm_image = match.group()
 
         if count == 0:
-            print "FATAL ERROR:pkg-file-list does not include a vm image name for turbo boot"
+            aulog.error("FATAL ERROR:pkg-file-list does not include a vm image name for turbo boot")
         elif count > 1:
-            print "FATAL ERROR:pkg-file-list include more than one vm image name for turbo boot"
+            aulog.error("FATAL ERROR:pkg-file-list include more than one vm image name for turbo boot")
             vm_image = None
 
         return vm_image
@@ -116,24 +116,23 @@ class IPlugin(object):
                     if status == 0:
                         host.send('\r')
 
-                print "Standby RP", srp, "has been shut down for Turboboot."
-                print "This script cannot restart Standby RP automatically."
-                print "Please restart Standby RP as follows after all processes done."
-                print "rommon 1> unset BOOT"
-                print "rommon 2> confreg 0x102"
-                print "rommon 3> sync"
-                print "rommon 4> reset"
+                aulog.info("Standby RP", srp, "has been shut down for Turboboot.")
+                aulog.info("This script cannot restart Standby RP automatically.")
+                aulog.info("Please restart Standby RP as follows after all processes done.")
+                aulog.info("rommon 1> unset BOOT")
+                aulog.info("rommon 2> confreg 0x102")
+                aulog.info("rommon 3> sync")
+                aulog.info("rommon 4> reset")
+                aulog.info(" ")
   
             else:
-                print "Stabdby RP is not in IOS XR RUN state."
-                print "You may need to update IOS-XR of Standby RP manually."
-                print "Besides that, this could interrupt the Turboboot process."
+                aulog.info("Stabdby RP is not in IOS XR RUN state.")
+                aulog.info("You may need to update IOS-XR of Standby RP manually.")
+                aulog.info("Besides that, this could interrupt the Turboboot process.")
             retval = 0
 
         except Exception as e:
-            print "## error ##"
-            print e
-            print "#########"
+            aulog.error(str(e))
             retval = -1
 
         return retval
@@ -161,9 +160,7 @@ class IPlugin(object):
                 host.expect(['rommon \w+ >'], timeout = 60)
 
         except Exception as e:
-            print "## error ##"
-            print e
-            print "#########"
+            aulog.error(str(e))
             retval = -1
 
         return retval
@@ -178,8 +175,8 @@ class IPlugin(object):
             host.sendline('set')
             status = host.expect(['IP_ADDRESS=(\d+\.\d+\.\d+\.\d+)', PROMPT])
             if status == 1:
-                print "IP_ADDRESS is not set"
-                print "turbo boot needs IP_ADDRESS set at rommon"
+                aulog.error("IP_ADDRESS is not set")
+                aulog.error("turbo boot needs IP_ADDRESS set at rommon")
                 retval = -1
                 return retval
             else:
@@ -204,9 +201,7 @@ class IPlugin(object):
                 host.expect('![!\.][!\.][!\.][!\.]', timeout = 180)
 
         except Exception as e:
-            print "## error ##"
-            print e
-            print "#########"
+            aulog.error(str(e))
             retval = -1
 
         return retval
@@ -229,9 +224,7 @@ class IPlugin(object):
                     if re.search(valid_state, host.after):
                         valid_card_num += 1
         except Exception as e:
-            print "## error ##"
-            print e
-            print "#########"
+            aulog.error(str(e))
             retval = -1
 
         return retval, card_num, valid_card_num
@@ -253,17 +246,15 @@ class IPlugin(object):
             
             if  valid_card_num == pre_valid_card_num: 
                 retval = 0
-                print "All cards seem to reach the valid status"
+                aulog.info("All cards seem to reach the valid status")
             else:
                 retval = -1
-                print "The number of cars in valid state is less than the number before turboboot."
-                print "Something woring happens on cards still in invalid state."
-                print "    The number of original valid cards was", pre_valid_card_num
-                print "    The number of current valid cards is", valid_card_num
+                aulog.error("The number of cars in valid state is less than the number before turboboot.")
+                aulog.error("Something woring happens on cards still in invalid state.")
+                aulog.error("    The number of original valid cards was" + str(pre_valid_card_num))
+                aulog.error("    The number of current valid cards is" + str(valid_card_num))
         except Exception as e:
-            print "## error ##"
-            print e
-            print "#########"
+            aulog.error(str(e))
             retval = -1
 
         return retval
@@ -295,7 +286,7 @@ class IPlugin(object):
                         retval = -1
                         return retval
                 else:
-                    print "Turboboot completed successfully"
+                    aulog.info("Turboboot completed successfully")
                     break
 
             while 1:
@@ -307,7 +298,7 @@ class IPlugin(object):
                         retval = -1
                         return retval
                 else:
-                    print "2nd boot is in progress"
+                    aulog.info("2nd boot is in progress")
                     break
 
             # login console
@@ -317,15 +308,13 @@ class IPlugin(object):
             host.expect(PASS)
             host.sendline(passwd)
             host.expect('RP/\d+/(RP|RSP)\d+/CPU\d+:.+#')
-            print "console login after turboboot"
+            aulog.info("console login after turboboot")
 
             # watch all cards status
             retval = self.watch_platform(host, pre_valid_card_num)
             
         except Exception as e:
-            print "## error ##"
-            print e
-            print "#########"
+            aulog.error(str(e))
             retval = -1
 
         return retval
@@ -335,16 +324,16 @@ class IPlugin(object):
         options = kwargs['options']
         retval = 0
         if options.turboboot:
-            print "Turboboot is requested and start processing."
+            aulog.info("Turboboot is requested and start processing.")
         else:
-            print "Turboboot is not reqested and do nothing."
+            aulog.info("Turboboot is not reqested and do nothing.")
             return retval
 
         # get the image vm name from the package list
         if (kwargs.has_key('pkg-file-list')):
             pkg_list = kwargs['pkg-file-list']
         else:
-            print "FATAL ERROR:pkg-file-list not provided"
+            aulog.error("FATAL ERROR:pkg-file-list not provided")
             retval = -1
             return retval
 
@@ -358,36 +347,34 @@ class IPlugin(object):
         try:
             host.expect(['#', pexpect.TIMEOUT], timeout = 1)
         except Exception as e:
-            print "## error ##"
-            print e
-            print "#########"
+            aulog.error(str(e))
             retval = -1
             return
 
         # get the standby rp in rommon
         retval = self.shutdown_standby_rp(host)
         if retval == -1:
-            print "connot get the standby rp into rommon mode before turboboot."
+            aulog.error("connot get the standby rp into rommon mode before turboboot.")
             return retval        
 
         # count the number of cards
         retval, card_num, valid_card_num = self.count_valid_cards(host)
         if retval == -1:
-            print "connot get the number of cards in valid state before turboboot."
+            aulog.error("connot get the number of cards in valid state before turboboot.")
             return retval
 
         # reload the devince and get it into rommon mode
         retval = self.reload(host)
         if retval == -1:
             return retval
-        print "Reload the router and get into ROMMON mode."
+        aulog.info("Reload the router and get into ROMMON mode.")
 
         # execute turbo boot
         repository = kwargs['repository']
         retval = self.turbo_boot(host, repository, vm_image)
         if retval == -1:
             return retval
-        print "Start Turboboot."
+        aulog.info("Start Turboboot.")
 
         # monitor the preogress of turbo boot
         login = options.login2
