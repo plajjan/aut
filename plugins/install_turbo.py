@@ -56,7 +56,7 @@ class IPlugin(object):
 
         status = os.path.exists(pkg_list)
         if not status:
-            aulog.error("FATAL ERROR:pkg-file-list not exists")
+            aulog.error("pkg-file-list not exists")
             return None
 
         file = open(pkg_list, 'r')
@@ -69,9 +69,9 @@ class IPlugin(object):
                 vm_image = match.group()
 
         if count == 0:
-            aulog.error("FATAL ERROR:pkg-file-list does not include a vm image name for turbo boot")
+            aulog.error("pkg-file-list does not include a vm image name for turbo boot")
         elif count > 1:
-            aulog.error("FATAL ERROR:pkg-file-list include more than one vm image name for turbo boot")
+            aulog.error("pkg-file-list include more than one vm image name for turbo boot")
             vm_image = None
 
         return vm_image
@@ -116,7 +116,7 @@ class IPlugin(object):
                     if status == 0:
                         host.send('\r')
 
-                aulog.info("Standby RP", srp, "has been shut down for Turboboot.")
+                aulog.info("Standby RP" + srp + "has been shut down for Turboboot.")
                 aulog.info("This script cannot restart Standby RP automatically.")
                 aulog.info("Please restart Standby RP as follows after all processes done.")
                 aulog.info("rommon 1> unset BOOT")
@@ -129,10 +129,11 @@ class IPlugin(object):
                 aulog.info("Stabdby RP is not in IOS XR RUN state.")
                 aulog.info("You may need to update IOS-XR of Standby RP manually.")
                 aulog.info("Besides that, this could interrupt the Turboboot process.")
+                aulog.info(" ")
             retval = 0
 
         except Exception as e:
-            aulog.error(str(e))
+            aulog.debug(str(e))
             retval = -1
 
         return retval
@@ -160,7 +161,7 @@ class IPlugin(object):
                 host.expect(['rommon \w+ >'], timeout = 60)
 
         except Exception as e:
-            aulog.error(str(e))
+            aulog.debug(str(e))
             retval = -1
 
         return retval
@@ -201,7 +202,7 @@ class IPlugin(object):
                 host.expect('![!\.][!\.][!\.][!\.]', timeout = 180)
 
         except Exception as e:
-            aulog.error(str(e))
+            aulog.debug(str(e))
             retval = -1
 
         return retval
@@ -224,7 +225,7 @@ class IPlugin(object):
                     if re.search(valid_state, host.after):
                         valid_card_num += 1
         except Exception as e:
-            aulog.error(str(e))
+            aulog.debug(str(e))
             retval = -1
 
         return retval, card_num, valid_card_num
@@ -253,8 +254,9 @@ class IPlugin(object):
                 aulog.error("Something woring happens on cards still in invalid state.")
                 aulog.error("    The number of original valid cards was" + str(pre_valid_card_num))
                 aulog.error("    The number of current valid cards is" + str(valid_card_num))
+                aulog.error(" ")
         except Exception as e:
-            aulog.error(str(e))
+            aulog.debug(str(e))
             retval = -1
 
         return retval
@@ -314,7 +316,7 @@ class IPlugin(object):
             retval = self.watch_platform(host, pre_valid_card_num)
             
         except Exception as e:
-            aulog.error(str(e))
+            aulog.debug(str(e))
             retval = -1
 
         return retval
@@ -333,7 +335,7 @@ class IPlugin(object):
         if (kwargs.has_key('pkg-file-list')):
             pkg_list = kwargs['pkg-file-list']
         else:
-            aulog.error("FATAL ERROR:pkg-file-list not provided")
+            aulog.error("pkg-file-list not provided")
             retval = -1
             return retval
 
@@ -347,15 +349,9 @@ class IPlugin(object):
         try:
             host.expect(['#', pexpect.TIMEOUT], timeout = 1)
         except Exception as e:
-            aulog.error(str(e))
+            aulog.debug(str(e))
             retval = -1
             return
-
-        # get the standby rp in rommon
-        retval = self.shutdown_standby_rp(host)
-        if retval == -1:
-            aulog.error("connot get the standby rp into rommon mode before turboboot.")
-            return retval        
 
         # count the number of cards
         retval, card_num, valid_card_num = self.count_valid_cards(host)
@@ -363,7 +359,14 @@ class IPlugin(object):
             aulog.error("connot get the number of cards in valid state before turboboot.")
             return retval
 
+        # get the standby rp in rommon
+        retval = self.shutdown_standby_rp(host)
+        if retval == -1:
+            aulog.error("connot get the standby rp into rommon mode before turboboot.")
+            return retval        
+
         # reload the devince and get it into rommon mode
+        sleep(60) # wait for standby becomes rommon mode
         retval = self.reload(host)
         if retval == -1:
             return retval
