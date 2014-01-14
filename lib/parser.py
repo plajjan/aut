@@ -81,9 +81,9 @@ def parsecli():
         metavar=' ', help="Continue with all pre-upgrade plugins by ignoring failures")
     oparser.add_option("--pre-upgrade-checks-only", action="store_const", const=1, dest="preupgradeset",
         default=0, metavar=" ", help="Run only Pre-upgrade checks")
-    oparser.add_option("--post-upgrade-checks-only", action="store_const", const=3, dest="postupgradeset", 
+    oparser.add_option("--post-upgrade-checks-only", action="store_const", const=1, dest="postupgradeset", 
         default=0, metavar=" ", help="Run only Post-upgrade checks, Note : Plugins which depend on data collected during pre upgrade checks to verify will fail , but execution will not be blocked")
-    oparser.add_option("--upgrade-only", action="store_const", const=2, dest="upgradeset", default=0,
+    oparser.add_option("--upgrade-only", action="store_const", const=1, dest="upgradeset", default=0,
         metavar=" ", help="do an upgrade without running pre and post upgrade checks")
     oparser.add_option("--turboboot", action="store_true", dest="turboboot", default=False,
         metavar=" ", help="execute turboboot (need console login)")
@@ -94,7 +94,7 @@ def parsecli():
     #oparser.add_option('-z', dest='optimize',action='store_true', default=False,
     #    metavar='Optimize',
     #    help='Optimize to not recreate packages if they exist in Package Repository')
-
+    
     if len(sys.argv) < 2 : 
         usage()
         sys.argv.extend("-h")
@@ -103,7 +103,6 @@ def parsecli():
         usage()
         sys.exit(-1)
     check_options(options)
-    
     return options,args
 
 def check_options(options):

@@ -72,7 +72,7 @@ class IPlugin(object):
                 print ""
                 return -1
         else:
-            print "No standby node found. Upgrade can proceed"
+            #print "No standby node found. Upgrade can proceed"
             print ""
             return 0
      

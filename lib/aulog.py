@@ -145,11 +145,6 @@ def error(str):
     print >> sys.stderr, term.RED + errmsg + term.NORMAL
 
     if au_logger is not None:
-        errmsg.replace('\033[96m',' ')
-        errmsg.replace('\033[92m',' ')
-        errmsg.replace('\033[93m',' ')
-        errmsg.replace('\033[91m',' ')
-        errmsg.replace('\033[0m',' ')
         au_logger.error(str)
 
     end_logging("Failed: %s" % (str))
@@ -177,11 +172,6 @@ def info(infomsg, color=None):
     print >> sys.stdout, infomsg
     if au_logger is not None:
         # Strip colour info from logfile
-        infomsg.replace('\033[96m',' ')
-        infomsg.replace('\033[92m',' ')
-        infomsg.replace('\033[93m',' ')
-        infomsg.replace('\033[91m',' ')
-        infomsg.replace('\033[0m',' ')
         au_logger.info(infomsg)
 
 
@@ -190,11 +180,6 @@ def debug(debugmsg):
         except logging is not enabled. """
 
     if au_logger is not None:
-        debugmsg.replace('\033[96m',' ')
-        debugmsg.replace('\033[92m',' ')
-        debugmsg.replace('\033[93m',' ')
-        debugmsg.replace('\033[91m',' ')
-        debugmsg.replace('\033[0m',' ')
         au_logger.debug(debugmsg)
     else:
         print "DEBUG: %s" % debugmsg

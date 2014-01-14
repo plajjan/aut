@@ -23,11 +23,11 @@
 import os
 import sys
 import commands
+from lib.global_constants import *
 
 
 class IPlugin:
     """
-    ASR9k Post-upgrade check
     This pluging commits the upgraded software and checks config consistency
     """
     plugin_name = "Config consistency check"
@@ -41,8 +41,8 @@ class IPlugin:
         """
         aulog.info("Executing the checks")
         dev_string = kwargs['options'].device.replace(" ","_")
-        CFG_CONS_FILE = ".cfg_consistancy." + dev_string
-        fd_log = open(CFG_CONS_FILE,"w")
+        #CFG_CONS_FILE = ".cfg_consistancy." + dev_string
+        #fd_log = open(CFG_CONS_FILE,"w")
         host = kwargs['session']
  
         #n_blank_count = 0
@@ -63,8 +63,8 @@ class IPlugin:
         output = host.before.split("\n")
 
         aulog.debug(output)
-        fd_log.write(output) 
-        fd_log.close()
+        #fd_log.write(output) 
+        #fd_log.close()
         #4. show install active/inactive/committed summary
         #5. Show configuration failed startup
  

@@ -53,7 +53,7 @@ class IPlugin(object):
                 if (not clis):
                     aulog.info(bcolors.WARNING + 
                         """Input file missing(-c option): 
-                           plugins expects file having list of CLI's to dump,
+                           Plugin expects file having list of CLI's to dump,
                            Ignoring"""+ bcolors.ENDC)
                     return 0 
 

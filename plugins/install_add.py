@@ -37,8 +37,6 @@ STAGING_DEVICE        = "."
 TFTP_COPY_CMD         = "cp"
 XML_ADD_FILE          = "/tmp/accel_upgrade_add.xml"
 XML_ADD_RESPONSE_FILE = "/tmp/accel_upgrade_add_response.xml"
-LOG_FILE              = "/tmp/acc_log.txt"
-ERROR_LOG_FILE        = "/tmp/acc_err_log.txt"
 TMP_LOG_FILE          = "/tmp/ms_log_file.txt"
 
 class IPlugin(object):
@@ -52,6 +50,7 @@ class IPlugin(object):
     plugin_name     = "Install Add"
     plugin_type     = PRE_UPGRADE_AND_UPGRADE
     plugin_version  = "1.0.0"
+    install_oper_id = 0
     
     def watch_operation(self):
         """
@@ -72,10 +71,7 @@ class IPlugin(object):
         try:
             self.command_exec.expect(['#'],searchwindowsize=1000)
         except Exception,e:
-            self.error_log_file.write("ERROR: in watch_operation\n")
-            self.error_log_file.write("exception occured while expecting # for the first time\n")
-            output = str(type(e))
-            self.error_log_file.write(output + "\n")
+            aulog.debug("Failure during watch operation of install add ") 
 
         while 1:
             self.command_exec.sendline(cmd)
@@ -93,9 +89,9 @@ class IPlugin(object):
                     try:
                         i = self.command_exec.expect([r'\b\d+,*\w* downloaded: Download in progress'],timeout=60,searchwindowsize=1000)
                     except Exception,e:
-                        self.error_log_file.write("failed in getting download progress\n")
+                        aulog.debug("failed in getting download progress\n")
                         err_msg = "%s"%(str(type(e)))
-                        self.error_log_file.write(err_msg + "\n")
+                        aulog.debug(err_msg + "\n")
 
                     match_str = re.findall(cpat1,txt)
                     if match_str:
@@ -119,46 +115,42 @@ class IPlugin(object):
                 stdout.flush()
 
             except pexpect.EOF:
-                self.error_log_file.write("EOF occurred when expecting result of show install req \n")
+                aulog.error("EOF occurred when expecting result of show install req \n")
                 retval = -1
                 break
             except pexpect.TIMEOUT:
-                self.error_log_file.write("TIMEOUT occurred when expecting result of show install req \n")
-                print "\ntimeout",self.command_exec.before
+                aulog.debug("\ntimeout",self.command_exec.before)
+                aulog.error("TIMEOUT occurred when expecting result of show install req \n")
                 #retval = -1
                 break  
         
         try:
-            self.command_exec.expect(['#'],searchwindowsize=1000)
+            self.command_exec.expect(['#'],searchwindowsize=1000,timeout=30)
         except Exception,e:
-            self.error_log_file.write("ERROR: in watch_operation\n")
-            self.error_log_file.write("exception occured while expecting # for the second time\n")
+            aulog.debug("ERROR: in watch_operation\n")
+            aulog.debug("exception occured while expecting # for the second time\n")
             output = str(type(e))
-            self.error_log_file.write(output + "\n")
+            aulog.debug(output + "\n")
   
-        cmd = "admin show install log %d"%(int(self.id))
+        cmd = "admin show install log %d"%(int(self.install_oper_id))
     
         self.command_exec.sendline(cmd)
         try:
-            index = self.command_exec.expect(['successfully','failed'],searchwindowsize=1000)
+            index = self.command_exec.expect(['successfully','failed'],searchwindowsize=1000,timeout=30)
             #print "index in watch %s"%(index)
             if ((index == 1)):
-                self.error_log_file.write("install add failed\n")
+                aulog.debug("install add failed\n")
                 retval = -1
             elif (index == 0):
-                #file_to_open = XML_ADD_RESPONSE_FILE + str(kwargs['ip_port'])
-                lib.global_constants.add_id = self.id 
-                #act_id = open(file_to_open,"w")
-                #act_id.write(self.id)
-                #act_id.close()
+                lib.global_constants.add_id = self.install_oper_id 
    
         except pexpect.EOF:
-            self.error_log_file.write("EOF encountered when expecting for other input\n")
-            self.error_log_file.write("ERROR:cannot parse show install log detail output\n")
+            aulog.debug("EOF encountered when expecting for other input\n")
+            aulog.debug("ERROR:cannot parse show install log detail output\n")
             retval = -1
         except pexpect.TIMEOUT:
-            self.error_log_file.write("TIMEOUT encountered when expecting for other input\n")
-            self.error_log_file.write("ERROR:cannot parse show install log detail output\n")
+            aulog.debug("TIMEOUT encountered when expecting for other input\n")
+            aulog.debug("ERROR:cannot parse show install log detail output\n")
             retval = -1
 
         return int(retval)
@@ -172,13 +164,13 @@ class IPlugin(object):
         if (kwargs.has_key('repository')):
             repo_str = kwargs['repository']
         else:
-            self.error_log_file("FATAL ERROR:repository not provided\n")
+            aulog.debug("FATAL ERROR:repository not provided\n")
             retval = -1
         if (retval == 0):
             if (kwargs.has_key('pkg-file-list')):
                 pkg_list = kwargs['pkg-file-list']
             else:
-                self.error_log_file("FATAL ERROR:pkg-file-list not provided\n")
+                aulog.debug("FATAL ERROR:pkg-file-list not provided\n")
                 retval = -1
         if (retval == 0):
             #copy file to local directory
@@ -189,8 +181,8 @@ class IPlugin(object):
                 status,output = commands.getstatusoutput(cmd)
                 print output
                 if (not(status == 0)):
-                    self.error_log_file.write(output + "\n")
-                    self.error_log_file.write("failed in copying pkg_list file to the box\n")
+                    aulog.debug(output + "\n")
+                    aulog.debug("failed in copying pkg_list file to the box\n")
                     retval = -1
         if (retval == 0):
             file_opened = open(pkg_list,"r")
@@ -218,9 +210,9 @@ class IPlugin(object):
                 #print "+"*20,"printing before add",self.command_exec.before
                 #print "+"*20,"printinf after add",self.command_exec.after
 #            except Exception,e:
-#                self.error_log_file.write("ERROR:failed when expecting # before doing add operation\n")
+#                aulog.debug("ERROR:failed when expecting # before doing add operation\n")
 #                output = str(type(e))
-#                self.error_log_file.write(output + "\n")
+#                aulog.debug(output + "\n")
             
             self.command_exec.sendline(cmd)
             try:
@@ -232,7 +224,7 @@ class IPlugin(object):
                     string = self.command_exec.after
                     is_number = re.findall(cnumber,string)
                     if is_number:
-                        self.id = is_number[0]
+                        self.install_oper_id = is_number[0]
                     else:
                         retval = -1
                 elif (index == 1):
@@ -241,26 +233,26 @@ class IPlugin(object):
                     try:
                         self.command_exec.expect([r'Install operation \d+'],timeout=60,searchwindowsize=1000)
                     except pexpect.EOF:
-                        self.error_log_file.write("cannot get install operation id.EOF encountered\n")
+                        aulog.debug("cannot get install operation id.EOF encountered\n")
                         retval = -1
                     except pexpect.TIMEOUT:
-                        self.error_log_file.write("cannot get install operation id. TIMEOUT encountered\n")
+                        aulog.debug("cannot get install operation id. TIMEOUT encountered\n")
                         retval = -1
 
                 
-                    #print self.id
+                    #print install_oper_id
                 #print "index is %s"%(str(index))
                 #if (index == 0):
                 #print "I m here"
                 #string = self.command_exec.after
                 #print string #for debugging purpose
-                #self.id = re.findall(cnumber,string)[0]
-                #print type(self.id)
+                #install_oper_id = re.findall(cnumber,string)[0]
+                #print type(install_oper_id)
             except pexpect.EOF:
-                self.error_log_file.write("EOF occured while expecting install operation id\n")
+                aulog.debug("EOF occured while expecting install operation id\n")
                 retval = -1
             except pexpect.TIMEOUT:
-                self.error_log_file.write("TIMEOUT occured while expecting install operation id\n")
+                aulog.debug("TIMEOUT occured while expecting install operation id\n")
                 retval = -1
 
             #print "*************",self.command_exec.after 
@@ -280,15 +272,14 @@ class IPlugin(object):
         Return False if the plugin has found a fatal error, True otherwise.
         """
         #opening log files for logging error messages
-        self.log_file        = open(LOG_FILE, "a")
-        self.error_log_file  = open(ERROR_LOG_FILE,"a")
+        #self.log_file        = open(LOG_FILE, "a")
+        #self.error_log_file  = open(ERROR_LOG_FILE,"a")
         retval = 0
-
         if (kwargs.has_key('session')):
             self.command_exec = kwargs['session']
             del kwargs['session']
         else:
-            self.error_log_file.write("FATAL ERROR: session details not provided\n") 
+            aulog.debug("FATAL ERROR: session details not provided\n") 
             retval = -1
 
         if (retval == 0):
@@ -303,8 +294,8 @@ class IPlugin(object):
         Stops the plugin (and prepares for deallocation)
         """
         #closing file opened for logging purposes
-        self.log_file.close()
-        self.error_log_file.close()
+        #self.log_file.close()
+        #self.error_log_file.close()
         pass
 
 

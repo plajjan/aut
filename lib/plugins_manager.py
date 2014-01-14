@@ -95,6 +95,40 @@ class PluginsManager(object):
     def __init__(self, directory = None):
         self.directory = directory
 
+
+
+    def should_load_plugin(self, plugin, **kwargs):
+        # If we are in  postupgrade check load only postupgrade plugin
+        # Plugin types and flag mapping
+        flag_none = [UPGRADE, PRE_UPGRADE, PRE_UPGRADE_AND_POST_UPGRADE, PRE_UPGRADE_AND_UPGRADE]
+        flag_pre_upgrade = [PRE_UPGRADE, PRE_UPGRADE_AND_POST_UPGRADE, PRE_UPGRADE_AND_UPGRADE]
+        flag_upgrade = [UPGRADE, PRE_UPGRADE_AND_UPGRADE]
+        flag_turboboot = [TURBOBOOT, PRE_UPGRADE, POST_UPGRADE]
+        flag_post_upgrade = [POST_UPGRADE, PRE_UPGRADE_AND_POST_UPGRADE]
+        if kwargs['options'].preupgradeset and plugin.plugin_type in flag_pre_upgrade :
+            # Return false for any plugin which is not applicable for pre upgrade
+            #print "Pre upgrade set and plugin type is ",plugin.plugin_type
+            return True
+        elif kwargs['options'].upgradeset and plugin.plugin_type in flag_upgrade :
+            # Return false for any plugin which is not applicable for upgrade
+            #print "Upgrade set and plugin type is ",plugin.plugin_type
+            return True
+        elif kwargs['options'].postupgradeset and plugin.plugin_type in flag_post_upgrade :
+            # Return false for any plugin which is not applicable for post upgrade
+            #print "Post upgrade set and plugin type is ",plugin.plugin_type
+            return True
+        elif not kwargs['options'].postupgradeset and not kwargs['options'].upgradeset and \
+            not kwargs['options'].preupgradeset and plugin.plugin_type in flag_none :
+            #print "No flags set and plugin type is ",plugin.plugin_type
+            return True
+            # If no options return True for all but post upgrade plugins
+            # For post upgrade test, the flag is set internaly by AU app
+        elif kwargs['options'].turboboot and plugin.plugin_type in flag_turboboot :
+            return True
+        else :
+            return False
+
+
     def VerifyClass(self,class_a,class_b):
         """ Ensure that all plugins have Iplugin class and  have defined minimum attribute 
 
@@ -133,6 +167,7 @@ class PluginsManager(object):
 
         for p in plugins:
             loaded = False
+            skipped = False
             directory = os.path.dirname(p)
             if not directory in sys.path:
                 sys.path.append(directory)
@@ -144,33 +179,30 @@ class PluginsManager(object):
             plugin = __import__(name)
 
 
-            try:
-                name = p.split("/")[-1].split(".py")[0]
-                aulog.debug("... inspecting '%s'"% name)
-                f, file, desc = imp.find_module(name, [directory])
-                plugin = __import__(name)
+            name = p.split("/")[-1].split(".py")[0]
+            aulog.debug("... inspecting '%s'"% name)
+            f, file, desc = imp.find_module(name, [directory])
+            plugin = __import__(name)
 
-                for k,v in inspect.getmembers(plugin):
-                    if k == KeyPluginClass :
-                        try:
-                            assert (not self.VerifyClass(IPlugin, v))
-                        except NotImplementedError, e:
-                            aulog.warning("Broken implementation of : %s" % name)
-                            continue
+            for k,v in inspect.getmembers(plugin):
+                if k == KeyPluginClass :
+                    try:
+                        assert (not self.VerifyClass(IPlugin, v))
+                    except NotImplementedError, e:
+                        aulog.warning("Broken implementation of : %s, skipping it.." % name)
+                        continue
+                    if self.should_load_plugin(v,**kwargs):
+                        aulog.debug("Loading plugin %s .."%(v.plugin_name))
                         instance = v()
                         aulog.debug("Adding an instance of %s" % (k,))
                         self.plugins.append((k, instance))
                         loaded = True
-                #instance = plugin.IPlugin()
-                #self.plugins.append((IPlugin, instance))
-                #loaded = True
-           
-                if not loaded :
-                    aulog.debug("Plugin %s is not loaded due to error(s) in its format.", name)
+                    else : 
+                        skipped = True
+                        aulog.debug("Skipping plugin %s .."%(v.plugin_name))
+            if not loaded and not skipped :
+                aulog.debug("Plugin %s is not loaded due to error(s) in its format."% name)
 
-            except Exception as e:
-                aulog.error("failed to load: %s" % str(p))
-                aulog.error("error: %s " % str(e))
 
         return len(self.plugins)
 

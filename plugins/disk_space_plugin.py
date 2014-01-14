@@ -97,12 +97,15 @@ class IPlugin(object):
         pkg_list = kwargs['pkg-file-list']
         status = 0
         dt = kwargs['results']
-        
+
+        if kwargs['options'].turboboot :
+           aulog.info("Disk space check is ignored for TURBOBOOT option")
+           return 0  
         if not pkg_list:
-           print bcolors.WARNING + "Pkg list file is not provided Ignoring this job" + bcolors.ENDC
+           aulog.info("Pkg list file is not provided Ignoring this job")
            return 0
            
-        print "Checking for free diskspace on boot device"
+        aulog.info("Checking for free diskspace on boot device")
 
         host.sendline('\r')
         try :
@@ -121,9 +124,8 @@ class IPlugin(object):
             status = host.expect_exact( [INVALID_INPUT, MORE, "#",
                                          LOGIN_PROMPT_ERR, EOF], timeout = tout_cmd)
         except :
-            print "Command: Timed out, before considering this as failure"
-            print "Please check following log file for details\n%s"%(host.logfile)
-            return -1;
+            aulog.warning("Disk space check failed, could not determine space available on disk")
+            return 0
 
         #print "Avilable disk space is %s MB "%(available_size/(1024*1024))
         #print host.before
@@ -143,7 +145,7 @@ class IPlugin(object):
                 total_req_size = total_req_size + get_pie_size(host, pkg_path, line.strip())
                 sleep(10)
         except: 
-           print bcolors.WARNING + "Pkg not found or Repository is not rechable couldn't get size of packages"
+           aulog.warning("Pkg not found or Repository is not rechable couldn't get size of packages")
 
         fd.close()
 

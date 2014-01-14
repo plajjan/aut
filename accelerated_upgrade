@@ -98,34 +98,6 @@ def main():
     for i in nloops:
         threads[i].join()
 
-    # Report the status of run for all devices
-    for line in good_count:
-        aulog.info(line + "Total elapsed time : %s"%(elapsed_time(line)))
-    if len(unknown_count) :
-        print "Total host that failed %d" % len(unknown_count)
-        for line in unknown_count:
-            print line
-    if len(badlp_count) :
-        print "Total host that had either incorrect login or passwords %d" % len(badlp_count)
-        for line in badlp_count:
-            print line
-    if len(timeout_count) :
-        print "Total host that timed out %d" % len(timeout_count)
-        for line in timeout_count:
-            print line
-    if len(reset_count) :
-        print "Total host that were reset by peer or Connection Closed by Peer %d" % len(reset_count)
-        for line in reset_count:
-            print line
-    if len(key_count) :
-        print "Total host that Host Key Verification Failed on %d" % len(key_count)
-        for line in key_count:
-            print line
-    if len(refused_count) :
-        print "Total host that Connection was refused on %d\n Check Access List" % len(refused_count)
-        for line in refused_count:
-            print line
-
     # send a notice of the end of processing when a mail address is given
     # this needs mail command of UNIX system
     if mail_address:
@@ -249,11 +221,39 @@ def reachable(host) :
     else :
         return False
 
-def telnet_login(host_list, login, passwd, connect_retry = 1):
+def get_prompt(host):
+     retry_count = 0
+     counter = 0
+     prompt = ""
+     # Try couple of iteration 
+     while retry_count < 7 :
+         host.sendline()
+         try:
+             index = host.expect_exact( ['#'], timeout=2)
+         except:
+             aulog.error("Failed to get prompt \n%s"%(host.before))
+         if index == 0 and counter == 0 :
+             counter = counter+1
+         # Two iteration to get the prompt between two CR
+         elif index == 0 and counter == 1 :
+             string = "%s%s"%(host.before,host.after)
+             match = re.search('\w+/\w+/\w+/\w+:.+#', string)
+             if match:
+                 prompt = match.group()
+                 break
+             else :
+                 counter = 0
+     if not prompt == "" :
+         return prompt
+     else :
+         # Code would never reach here !!
+         aulog.error("Failed to get router prompt")
+
+def telnet_login(host_list, login, passwd, connect_retry = 3):
     host = host_list[0]
     authorized = False
+    max_retry_count = connect_retry
     status = 0
-
     # Before startng see if device is reachable 
     device_address = host.strip()
     device_address = device_address.split(" ")[0]
@@ -263,22 +263,32 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
 
     session = "telnet " + host
     command = pexpect.spawn( session, maxread=MAXREAD, searchwindowsize=WINDOWSIZE  )
+    aulog.debug("Connecting to %s using %s" % ( host, session ))
     if term == "telnet":
-        aulog.debug("Connecting to %s using %s" % ( host, session ))
+        while connect_retry > 0 :
+            connect_retry = connect_retry -1
+            status,session = login_to_router(command,login,passwd,host)
+            if status == 0 :
+                break
+            aulog.info("Connection retry ...%s"%(max_retry_count-connect_retry))
+        return (status,session)   
+
+def login_to_router(command,login,passwd,host):
+        status = 0
         # Initial "CR"
         command.sendline()
         sleep(3)
         try:
-            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "ios#", "Press RETURN to get started"], timeout=tout )
+            status = command.expect( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, '\w+/\w+/\w+/\w+:.+#', "Press RETURN to get started"], timeout=tout )
         except:
             status = 10
-            aulog.error( command.before + command.after )
+            #aulog.error(command.before)
             return( status, command )
 
-        aulog.debug( command.before + command.after )
+        aulog.debug(command.before)
         if status == 5:
             command.send('\r')
-            status = command.expect_exact( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, "#"], timeout=tout )
+            status = command.expect( [USERNAME, EOF, CONNECTION_REFUSED, RESET_BY_PEER, '\w+/\w+/\w+/\w+:.+#'], timeout=tout )
 
         if status == 0 :
             # Username: prompt
@@ -287,7 +297,7 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
              try:
                  status = command.expect_exact( [PASS, EOF, CONNECTION_REFUSED, LOGIN_PROMPT, RESET_BY_PEER], timeout=tout )
              except:
-                 aulog.error( command.before + command.after )
+                 #aulog.error( command.before )
                  status = 10
                  return( status, command )
 
@@ -295,7 +305,7 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
                 command.sendline(passwd)
                 #print"send pass ", passwd
                 try:
-                    status = command.expect_exact( ['#', USERNAME, pexpect.TIMEOUT], timeout=tout)
+                    status = command.expect( ['\w+/\w+/\w+/\w+:.+#', USERNAME, pexpect.TIMEOUT], timeout=tout)
                     if status == 1:
                         status = 11
                         return( status, command )
@@ -305,7 +315,7 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
                     # the 2nd authentication would be needed
                     elif status == 2:
                         command.send('\r')
-                        status = command.expect_exact( ['#', USERNAME, pexpect.TIMEOUT], timeout=tout)
+                        status = command.expect( ['\w+/\w+/\w+/\w+:.+#', USERNAME, pexpect.TIMEOUT], timeout=tout)
                         if status == 1:
                             status = 11
                             return( status, command )
@@ -326,7 +336,7 @@ def telnet_login(host_list, login, passwd, connect_retry = 1):
                     status = command.expect_exact( [USERNAME, PASS, PERMISSION_DENIED, LOGIN_PROMPT, EOF], timeout=tout )
                     print "Logged in ...."
             elif not command.isalive():
-                aulog.error("Connection refused..")
+                aulog.error("%s\nConnection refused.."%(command.before))
             elif status == 1:
                 command.sendline(passwd)
                 status = command.expect( [USERNAME, PASS, PERMISSION_DENIED, LOGIN_PROMPT, EOF], timeout=tout )
@@ -364,15 +374,14 @@ def second_login(host, login, passwd):
 
 def wait_loop(sec):
      bang = 0
-     while bang<(sec/4):
+     while bang < (sec/4):
          try :
              sleep(4)
              sys.stdout.write('!')
              sys.stdout.flush()
              bang = bang + 1
          except KeyboardInterrupt:
-             # quit
-             sys.exit("Keyboard interupt by user")
+             aulog.error("Keyboard interupt by user")
 
 def command_exec(dline, options):
     kwargs = {}
@@ -420,6 +429,7 @@ def command_exec(dline, options):
         # log succeed, go ahead  and start 
         # plugin manager
         #=======================================
+
         run_status = blast_plugins(host, options)
        
         if run_status == NO_PLUGINS:
@@ -434,41 +444,55 @@ def command_exec(dline, options):
         #======================================
         
         if run_status == SYSTEM_RELOADED and options.upgradeset == 0:
-           print_success("\n++++ Done with PreUpgrade checks and Upgrade ++++")
-           # wait for a minute complete install operation
-           # after success
-           print_success("\n++++ Please wait while install completes  ++++")
-           wait_loop(60)
-           print ""
-           #Shutdown session gracefully
-           host.sendline('quit')
-           host.sendline('exit')
-           host.close()
-           retry=0
-           while retry<30:
-               try:
-                   # wait for a minute to retry
-                   auth, host = telnet_login( dline, options.login, options.password)
-                   #check were we able to login
-                   if auth == 0:
-                      #after console is available wait some time nodes to comeup
-                      if retry > 0:
-                         print_success("\n++++ Waiting for nodes to come up ++++")
-                         wait_loop(5*60) 
-                      #modify options to run only post upgrade checks
-                      options.preupgradeset = 0
-                      options.upgradeset = 0
-                      options.postupgradeset = 1 
-                      print_success("\n++++ Starting Postupgrade checks ++++")
-                      run_status = blast_plugins(host, options)
-                      break
-                   else:
-                       print_success("\n++++ Please wait ..reconnecting to the box ++++")
-                       wait_loop(60)
-                       retry=retry+1
-               except KeyboardInterrupt:
-                   # quit
-                   sys.exit("Keyboard interupt by user")
+            #Shutdown session gracefully
+            host.sendline('quit')
+            host.sendline('exit')
+            host.close()
+            retry=0
+            print_success("\n++++ Activate done, system reloading  ++++")
+            # wait for a minute complete install operation
+            # after success
+            print_success("\n++++ Please wait while systems comes up with new set of packages ++++\n")
+            # Wait for 60 sec and then strt polling if system is up
+            wait_loop(60)
+
+            while retry < 10:
+                try:
+                    # wait for a minute to retry
+                    auth, host = telnet_login( dline, options.login, options.password,30)
+                    #check were we able to login
+                    if auth == 0:
+                        #after console is available wait some time nodes to comeup
+                        if retry > 0:
+                            print_success("\n++++ Waiting for nodes to come up ++++")
+                            wait_loop(5*60) 
+
+                        break
+                    else:
+                        print_success("\n++++ Please wait ..reconnecting to the box ++++")
+                        wait_loop(60)
+                        retry=retry+1
+                except KeyboardInterrupt:
+                    aulog.error("Keyboard interupt by user")
+
+            #modify options to run only post upgrade checks
+            options.preupgradeset = 0
+            options.upgradeset = 0
+            options.postupgradeset = 1 
+            options.turboboot = False
+            print_success("\n++++ Starting Postupgrade checks ++++")
+            run_status = blast_plugins(host, options)
+
+        # If process restart and flag for only pre-upgrade or only upgrade is not set
+        elif run_status == INSTALL_METHOD_PROCESS_RESTART and not options.upgradeset and not options.preupgradeset :
+            #modify options to run only post upgrade checks
+            options.preupgradeset = 0
+            options.upgradeset = 0
+            options.postupgradeset = 1 
+            options.turboboot = False
+            print_success("\n++++ Starting Postupgrade checks ++++")
+            run_status = blast_plugins(host, options)
+        
         status = run_status
         #try :
         #    status = host.expect_exact( [INVALID_INPUT, MORE, PROMPT, EOF], timeout=tout )
@@ -562,21 +586,23 @@ def blast_plugins(host, options):
         else:
             kwargs['repository'] = options.repository_path + "/"
 
+
+        prompt = get_prompt(host)
+        kwargs['prompt'] = prompt
         kwargs['pkg-file-list'] = options.pkg_file
         kwargs['cmd_file'] = options.cli_file
         kwargs['options'] = options
         if cmd_file and not os.path.isfile(kwargs['cmd_file']):
-           print bcolors.WARNING +"++++++++ %s file doesn't exist +++++++++"%(options.pkg_file) + bcolors.ENDC
-           sys.exit(0)
-        try:
-          if options.pkg_file and os.path.getsize(options.pkg_file) < 1 :
+             print bcolors.WARNING +"++++++++ %s file doesn't exist +++++++++"%(options.pkg_file) + bcolors.ENDC
+             sys.exit(0)
+        if not os.path.exists(options.pkg_file):
+             print bcolors.WARNING +"++++++++  File %s doesn't exist  +++++++++"%(options.pkg_file) + bcolors.ENDC
+             sys.exit(0)
+        if options.pkg_file and os.path.getsize(options.pkg_file) < 1 :
              print bcolors.WARNING +"++++++++ No packages found in file %s  +++++++++"%(options.pkg_file) + bcolors.ENDC
              sys.exit(0)
-        except:
-             print bcolors.WARNING +"++++++++  %s doesn't exist  +++++++++"%(options.pkg_file) + bcolors.ENDC
-             sys.exit(0)
         PluginsManager = plugins_manager.PluginsManager()
-        plugins = PluginsManager.load_plugins()
+        plugins = PluginsManager.load_plugins(**kwargs)
         if plugins :
             status=PluginsManager.start(**kwargs)
             print "Done with all plugins..",

@@ -3,6 +3,7 @@ import re
 import inspect
 import pprint
 import sys
+from lib import aulog
 
 PIE = "pie"
 ACTIVE = "active"
@@ -39,7 +40,7 @@ class PackageClass(object):
 
 class NewPackage():
     def __init__(self, pkg_lst_file=None):
-        self.inputfile = None
+        self.inputfile = pkg_lst_file
         self.pkg_list = []
         if pkg_lst_file :
             self.inputfile = pkg_lst_file
@@ -48,9 +49,10 @@ class NewPackage():
     def update_pkgs(self):
         if os.path.exists(self.inputfile):
             fd = open(self.inputfile,"r")
+
             for line in fd.readlines() :
                 pkg_name = line.strip()
-                pkg = self.validate_xrpie_pkg(pkg_name)
+                pkg = self.validate_offbox_xrpie_pkg(pkg_name)
                 if not pkg :
                     pkg = self.validate_xrrpm_pkg(pkg_name)
                 if not pkg:
@@ -60,7 +62,9 @@ class NewPackage():
                     self.pkg_list.append(pkg)
         fd.close()
       
-    def validate_xrpie_pkg(self,pkg):
+    def validate_offbox_xrpie_pkg(self,pkg):
+        #asr9k-px-4.3.2.CSCuj61599.pie
+        #asr9k-mpls-px.pie-4.3.2
         pkg_expr_2pkg = re.compile(r'(?P<PLATFORM>\w+)-(?P<PKGNAME>\w+)-(?P<SUBPKGNAME>\w+)-(?P<ARCH>p\w+)\.(?P<PKGFORMAT>\w+)-(?P<VERSION>\d+\.\d+\.\d+)')
         pkg_expr = re.compile(r'(?P<PLATFORM>\w+)-(?P<PKGNAME>\w+)-(?P<ARCH>p\w+)\.(?P<PKGFORMAT>\w+)-(?P<VERSION>\d+\.\d+\.\d+)')
         smu_expr = re.compile(r'(?P<PLATFORM>\w+)-(?P<ARCH>\w+)-(?P<VERSION>\d+\.\d+\.\d+)\.(?P<PKGNAME>\w+)\.(?P<PKGFORMAT>\w+)')
@@ -119,6 +123,7 @@ class OnboxPackage():
             if pkg :
                 self.pkg_list.append(pkg)
       
+
     def validate_xrpie_pkg(self,pkg):
         #disk0:asr9k-mini-px-4.3.2
         #asr9k-px-4.2.3.CSCue60194-1.0.0
@@ -176,9 +181,26 @@ def extra_pkgs(list1, list2) :
 def pkg_tobe_activated(added_pkgs,inactive_pkgs,active_pkgs):
     tobe_added = []
     # All added packages should either be active or inactive
+    
+    # Get the added package which is not in inactive state
     missing_in_inactive = missing_pkgs(added_pkgs,inactive_pkgs)
+
+    # If package to be activated is not in inactive state , see if that's already active
     if missing_in_inactive :
         missing_in_inactive = missing_pkgs(missing_in_inactive,active_pkgs)
+
+    # For debug purpose only 
+    aulog.debug("Package to be activated")
+    for i in added_pkgs :
+        aulog.debug(i.pkg)
+    aulog.debug("Package inactive state")
+    for i in inactive_pkgs :
+        aulog.debug(i.pkg)
+    aulog.debug("Package active state")
+    for i in added_pkgs :
+        aulog.debug(i.pkg)
+
+    # End of debug
 
     if not missing_in_inactive :
         for pk1 in added_pkgs:

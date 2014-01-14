@@ -9,8 +9,6 @@ import lib.pkg_utils
 
 #few macros/constants used in the code
 XML_ADD_RESPONSE_FILE   = "/tmp/accel_upgrade_add_response.xml"
-LOG_FILE                = "/tmp/acc_log.txt"
-ERROR_LOG_FILE          = "/tmp/acc_err_log.txt"
 XML_ACT_FILE            = "/tmp/accel_upgrade_act.xml"
 XML_ACT_RESPONSE_FILE   = "/tmp/accel_upgrade_act_response.xml"
 pkgutils = lib.pkg_utils
@@ -26,12 +24,13 @@ class IPlugin:
     plugin_name = "Install Act"
     plugin_type = UPGRADE
     plugin_version = "1.0.0"
-
-    def watch_operation(self):
+    install_oper_id = 0
+    prompt = "#"
+    def watch_operation(self,host):
         """
         function to keep watch on progress of operation
         """
-        retval = SYSTEM_RELOADED
+        retval = INSTALL_METHOD_PROCESS_RESTART
         chars = '\\'
         pat = r'There are no install requests in operation'
         cpat = re.compile(pat)
@@ -41,25 +40,27 @@ class IPlugin:
         cpat2 = re.compile(r'\d+,*\w* downloaded: Download in progress')
         count = 0
 
-        #expecting shell before sending any commands
+        #expecting install method
+        host.sendline()
         try:
-            self.command_exec.expect(['#'],searchwindowsize=1000,timeout=30)
+            index = host.expect(['Install Method: Parallel Process Restart','This operation will reload the following node:'],searchwindowsize=1000,timeout=30)
         except Exception,e:
-            self.error_log_file.write("ERROR: in watch_operation\n")
-            self.error_log_file.write("exception occured while expecting # for the first time\n")
             output = str(type(e))
-            self.error_log_file.write(output + "\n")
+            aulog.error("Exception occured while expecting install method\n%s,\n%s"%(host.before,output))
+        if index == 1 : 
+            retval = SYSTEM_RELOADED
 
+        retry_count = 0
         while 1:
-            self.command_exec.sendline(cmd)
+            host.sendline(cmd)
             try:
-                index = self.command_exec.expect(['The operation is \d+% complete','There are no install requests in operation'],searchwindowsize=1000,timeout=30)
-                if (index == 1):
+                index = host.expect(['The operation is \d+% complete','There are no install requests in operation',self.prompt],timeout=90)
+                if (index == 1 or index == 2):
                     stdout.write("\n%c 100%% complete \r"%(chars))
                     break
                 elif (index == 0):
                     display_string = ""
-                    txt = self.command_exec.after
+                    txt = host.after
                     match_str = re.findall(cpat1,txt)
                     if match_str:
                         display_string = display_string + str.strip(str(match_str[0]))
@@ -77,151 +78,136 @@ class IPlugin:
                 stdout.flush()
 
             except pexpect.EOF:
-                self.error_log_file.write("EOF occurred when expecting result of show install req \n")
-                retval = -1
+                aulog.error("EOF occurred when expecting result of show install req \n")
                 break
             except pexpect.TIMEOUT:
-                self.error_log_file.write("TIMEOUT occurred when expecting result of show install req \n")
-                print "\ntimeout",self.command_exec.before
-                #retval = -1
+                aulog.debug(cmd)
+                aulog.error("TIMEOUT occurred when expecting result of show install req")
                 break  
         
+        host.sendline()
         try:
-            self.command_exec.expect(['#'],searchwindowsize=1000,timeout=30)
+            host.expect_exact(['#'],searchwindowsize=1000,timeout=30)
         except Exception,e:
-            self.error_log_file.write("ERROR: in watch_operation\n")
-            self.error_log_file.write("exception occured while expecting # for the second time\n")
+            aulog.error("ERROR: in watch_operation\n")
+            aulog.error("exception occured while expecting # for the second time\n")
             output = str(type(e))
-            self.error_log_file.write(output + "\n")
-  
-        cmd = "admin show install log %d"%(int(self.id))
+            aulog.error(output + "\n")
+
+        cmd = "admin show install log %d"%(int(self.install_oper_id))
     
-        self.command_exec.sendline(cmd)
+        host.sendline(cmd)
         try:
-            index = self.command_exec.expect(['successfully','failed'],searchwindowsize=1000,timeout=30)
-            aulog.info(self.command_exec.after)
-            aulog.info(self.command_exec.before)
+            index = host.expect_exact(['successfully','failed'],searchwindowsize=1000,timeout=30)
+            aulog.info(host.after)
+            aulog.info(host.before)
             if ((index == 1)):
-                self.error_log_file.write("install act failed\n")
-                retval = -1
+                aulog.error("install act failed\n")
             elif (index == 0):
                 act_id = open(XML_ADD_RESPONSE_FILE,"w")
-                act_id.write(self.id)
+                act_id.write(self.install_oper_id)
                 act_id.close()
   
         except pexpect.EOF:
-            self.error_log_file.write("EOF encountered when expecting for other input\n")
-            self.error_log_file.write("ERROR:cannot parse show install log detail output\n")
-            retval = SYSTEM_RELOADED
+            aulog.error("Cannot parse show install log detail output\n")
         except pexpect.TIMEOUT:
-            self.error_log_file.write("TIMEOUT encountered when expecting for other input\n")
-            self.error_log_file.write("ERROR:cannot parse show install log detail output\n")
-            retval = SYSTEM_RELOADED
+            if retry_count > 5 :
+                aulog.error("%s\n%s\nTIMEOUT encountered when expecting for other input\n"%(cmd,host.before))
+            else :
+                aulog.debug("%s\n%s\nTIMEOUT encountered when expecting for other input\n"%(cmd,host.before))
+                retry_count = retry_count + 1
+            
 
         return int(retval)
 
 
 
 
-    def install_getID(self):
-        """
-        get the install id of add operation
-        """
-        self.id = -1
+    def get_active_pkgs(self,host):
 
-    def get_active_pkgs(self):
-
-        self.command_exec.sendline()
-        sleep(5)
-        status = self.command_exec.expect_exact( [INVALID_INPUT,"#", MORE, PROMPT, EOF],
-               timeout = 10)
-        self.command_exec.sendline("admin show install active summary")
-        sleep(5)
+        cmd = "admin show install active summary"
+        host.sendline(cmd)
         try :
-           status = self.command_exec.expect_exact( [INVALID_INPUT,"#", MORE, PROMPT, EOF],
-               timeout = 10)
+           status = host.expect_exact( [INVALID_INPUT,self.prompt, MORE, PROMPT, EOF],
+               timeout = 20)
         except :
            return None
-        return self.command_exec.before
+        aulog.debug("%s\n%s"%(cmd,host.before))
+        return host.before
 
-    def get_inactive_pkgs(self):
-
-        self.command_exec.sendline()
-        sleep(5)
-        status = self.command_exec.expect_exact( [INVALID_INPUT,"#", MORE, PROMPT, EOF],
-               timeout = 10)
-        self.command_exec.sendline("admin show install inactive summary")
-        sleep(5)
+    def get_inactive_pkgs(self,host):
+        cmd = "admin show install inactive summary"
+        host.sendline(cmd)
         try :
-           status = self.command_exec.expect_exact( [INVALID_INPUT,"#", MORE, PROMPT, EOF],
-               timeout = 10)
+            status = host.expect_exact( [INVALID_INPUT,self.prompt, MORE, PROMPT, EOF], timeout = 30)
         except :
-           return None
-        return self.command_exec.before
+            return None
+        aulog.debug("%s\n%s"%(cmd,host.before))
+        return host.before
 
-    def get_tobe_activated_pkglist(self,kwargs):
+    def get_tobe_activated_pkglist(self,host,kwargs):
         pkg_list = kwargs['pkg-file-list']
         added_pkgs = pkgutils.NewPackage(pkg_list)
-        inactive_pkgs = self.get_inactive_pkgs()
-        active_pkgs = self.get_active_pkgs()
-        inactive_pkgs = pkgutils.OnboxPackage(inactive_pkgs,"inactive")  
-        active_pkgs = pkgutils.OnboxPackage(active_pkgs,"install active")  
-        pkg_to_activate  = pkgutils.pkg_tobe_activated(added_pkgs.pkg_list,inactive_pkgs.pkg_list,active_pkgs.pkg_list)
-        return " ".join(pkg_to_activate)
+        added_pkgs_raw = open(pkg_list,'r').read()
+        inactive_pkgs_raw = self.get_inactive_pkgs(host)
+        active_pkgs_raw = self.get_active_pkgs(host)
+
+        inactive_pkgs = pkgutils.OnboxPackage(inactive_pkgs_raw,"inactive")  
+        active_pkgs = pkgutils.OnboxPackage(active_pkgs_raw,"install active")  
+        package_to_activate  = pkgutils.extra_pkgs(active_pkgs.pkg_list,added_pkgs.pkg_list)
+
+        # Test If there is anything to activate
+        if not package_to_activate :
+            return 
+        else :
+            pkg_to_activate  = pkgutils.pkg_tobe_activated(added_pkgs.pkg_list,inactive_pkgs.pkg_list,active_pkgs.pkg_list)
+            if not pkg_to_activate :
+                state_of_packages = "To be added :\n%s\n%s%s"%(added_pkgs_raw,inactive_pkgs_raw,active_pkgs_raw)
+                aulog.error("One or more package to be activated is not in inactive state.\n%s"%(state_of_packages))
+            else :
+                return " ".join(pkg_to_activate)
 
 
-    def install_act(self,kwargs):
+    def install_act(self,host,kwargs):
         """
-        it performs activate operation
+        it performs install activate operation
         """
         retval = 0
-        
         #get install operation ID of add operation which
         #added packages to be executed
-        self.install_getID()
-        if (self.id > 0) :
-            self.get_pkg_list()
-            #log the activity
-            log_msg = "install operation ID to be executed is %d\n"%(self.id)
-            self.log_file.write(log_msg)
-            cmd = " admin install activate id %d prompt-level none"%(int(self.id))
-        else :
-            tobe_activated = self.get_tobe_activated_pkglist(kwargs)
-            if not tobe_activated :
-                aulog.error( """
-                Package list is empty or all package are not in inactive state""")
-                return -1
-            cmd = " admin install activate %s prompt-level none"%(tobe_activated)
+        tobe_activated = self.get_tobe_activated_pkglist(host,kwargs)
+        if not tobe_activated :
+            aulog.warning( "The package is already active , nothing to be activated.")
+            return SKIPPED
+        cmd = " admin install activate %s prompt-level none"%(tobe_activated)
         aulog.info(cmd)
         number = r'\d+'
         cnumber = re.compile(number)
         sleep(2)
-
+        host.sendline()
         try:
-            self.command_exec.expect(['#'],searchwindowsize=1000)
+            host.expect_exact(['#'],searchwindowsize=1000)
         except Exception,e:
-            self.error_log_file.write("ERROR:failed when expecting # before doing act operation\n")
+            aulog.error("ERROR:failed when expecting # before doing act operation\n")
             output = str(type(e))
-            self.error_log_file.write(output + "\n")
+            aulog.error(output + "\n")
 
 
-        self.command_exec.sendline(cmd)
+        host.sendline(cmd)
         try:
-            index = self.command_exec.expect(['Install operation \d+'],timeout=30,searchwindowsize=1000)
-            string = self.command_exec.after
+            index = host.expect(['Install operation \d+',],timeout=90,searchwindowsize=1000)
+            string = host.after
             is_number = re.findall(cnumber,string)
             if is_number:
-                self.id = is_number[0]
-            #print self.id
-
+                self.install_oper_id = is_number[0]
+                aulog.debug("Started install operation %s "%(is_number))
         except pexpect.EOF:
-            self.error_log_file.write("EOF occurred while expecting LOGIN PROMPT\n")
-            self.error_log_file.write("activate operation didnt execute properly\n")
+            aulog.error("EOF occurred while expecting LOGIN PROMPT\n %s"%host.before)
             retval = -1
 
         except pexpect.TIMEOUT:
-            self.error_log_file.write("TIMEOUT occurred while expecting LOGIN PROMPT\n")
-            self.error_log_file.write("activate operation didnt execute properly\n")
+            aulog.debug(cmd)
+            aulog.error("TIMEOUT occurred while expecting LOGIN PROMPT\n %s"%host.before)
             retval = -1
 
         return int(retval)
@@ -234,31 +220,31 @@ class IPlugin:
         Return False if the plugin has found a fatal error, True otherwise.
         """
         retval = 0
-        #opening log files for logging error messages
-        self.log_file        = open(LOG_FILE, "a")
-        self.error_log_file  = open(ERROR_LOG_FILE,"a")
-
+        self.prompt = kwargs['prompt']
         if (kwargs.has_key('session')):
-            self.command_exec = kwargs['session']
-            del kwargs['session']
+            host = kwargs['session']
         else:
-            error_log_file.write("FATAL ERROR: session details not provided\n")
+            aulog.error("FATAL ERROR: session details not provided\n")
             retval = -1
-        
+
+        #  Be at # prompt in begining
+        try :
+            status = host.expect_exact( [INVALID_INPUT,self.prompt, MORE, PROMPT, EOF], timeout = 5)
+        except :
+            aulog.debug("Timed out in install_act plugin, while expecting prompt at entry")
+
         if (retval == 0):
-            retval = self.install_act(kwargs)
+            retval = self.install_act(host,kwargs)
+            if retval == SKIPPED :
+                return SUCCESS 
         if (retval == 0):
-            retval = self.watch_operation()
-        return int(retval)
+            restart_type = self.watch_operation(host)
+        return int(restart_type )
 
     def stop(self):
         """
         Stops the plugin (and prepares for deallocation)
         """
-        #closing file opened for logging purposes
-        self.log_file.close()
-        self.error_log_file.close()
-
         pass
 
 

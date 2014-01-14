@@ -31,12 +31,19 @@ SYSTEM_RELOADED = 1001
 INSTALL_METHOD_RELOAD = SYSTEM_RELOADED
 INSTALL_METHOD_PROCESS_RESTART = 1003
 
+# Execution state
+SUCCESS = 0
+SKIPPED = 1
+IGNORED = 2
+NOT_NEEDED = 3
+FAIL = -1
+
 NO_PLUGINS = 1002
 IOS = 'IOS'
 IOS_XR = "IOS XR"
 WINDOWSIZE = -1
 LOGIN_PROMPT = "#"
-PROMPT = "\>(\s{0,2})?$|\%(\s{0,2})?$|\$(\s{0,2})?$|\#(\s{0,2})?$"
+PROMPT = "#"
 ROOT_PROMPT = "\#"
 PERMISSION_DENIED = ".*enied|.*nvalid|.*ailed"
 MODULUS_TO_SMALL = "modulus too small"
@@ -107,6 +114,7 @@ def print_success(str):
     aulog.info(str)
 
 # Plugin types
+TURBOBOOT            = "TURBOBOOT"
 UPGRADE              = "UPGRADE"
 PRE_UPGRADE          = "PRE_UPGRADE"
 POST_UPGRADE         = "POST_UPGRADE"
