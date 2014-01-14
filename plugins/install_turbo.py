@@ -56,7 +56,6 @@ class IPlugin(object):
 
         status = os.path.exists(pkg_list)
         if not status:
-            aulog.debug(func_name)
             aulog.error("pkg-file-list not exists")
             return None
 
@@ -163,8 +162,7 @@ class IPlugin(object):
                 host.expect(['rommon \w+ >'], timeout = 60)
 
         except Exception as e:
-            func_name = sys._getframe().f_code.co_name
-            aulog.debug(host.before + str(e))
+            aulog.debug(str(e))
             retval = -1
 
         return retval
@@ -328,11 +326,12 @@ class IPlugin(object):
 
             aulog.info("Login after turboboot successful..")
 
+
             # watch all cards status
             retval = self.watch_platform(host, pre_valid_card_num)
             
         except Exception as e:
-            aulog.debug("While watch operation :%s %s"%(host.before,str(e)))
+            aulog.debug("During watch operation :%s %s"%(host.before,str(e)))
             retval = -1
 
         return retval
