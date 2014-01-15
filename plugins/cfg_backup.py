@@ -61,7 +61,7 @@ class IPlugin(object):
                    pass
                 try: 
                     # Set terminal length
-                    host.sendline("terminal length 500")
+                    host.sendline("terminal length 0")
                     host.expect_exact("#")
 
 	    	    # Pass CLI's to box
@@ -92,7 +92,7 @@ class IPlugin(object):
                     return -1
 
                 # reset terminal length
-                host.sendline("terminal length 0")
+                host.sendline("terminal length 100")
                 try: 
                     host.expect_exact("#")
                 except :
