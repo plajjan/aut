@@ -63,7 +63,7 @@ class IPlugin(object):
 
         count = 0
         for line in file:
-            match = re.match(r'.+\.vm-\d+\.\d+\.\d+$', line)
+            match = re.match(r'.+\.vm-.+$|.+\.vm$', line)
             if match:
                 count += 1
                 vm_image = match.group()
