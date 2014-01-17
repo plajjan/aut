@@ -47,7 +47,6 @@ class IPlugin(object):
 
 
 	def start(self, **kwargs):
-                MORE = '--more--|--More--'
 
                 # Get the session
                 dev_string = kwargs['options'].device.replace(" ","_")
@@ -59,6 +58,7 @@ class IPlugin(object):
                    host.expect_exact("#", timeout = 15)
                 except:
                    pass
+
                 try: 
                     # Set terminal length
                     host.sendline("terminal length 0")
@@ -67,28 +67,18 @@ class IPlugin(object):
 	    	    # Pass CLI's to box
                     host.sendline("show running")
 
-                    while 1:
-                        status = host.expect_exact( [INVALID_INPUT, MORE, "end\r\n", EOF], timeout = tout_cmd)
-		        self.save_configs(host.before, '.configuration_backup_file')
-                        # match more
-                        if status == 1:
-                            host.send(" ")
-                            continue
-                        # match end
-                        elif status == 2:
-                            self.save_configs(host.after, '.configuration_backup_file')
-                            break
-                        else:
-                            print "Unxpected statements"
-                            print "Please check following log file for details\n%s"%(host.logfile)
-                            return -1
-                    # end of while
+                    status = host.expect_exact( ["end\r\n", INVALID_INPUT, EOF], timeout = tout_cmd)
+		    self.save_configs(host.before, '.configuration_backup_file')
+                    if status != 0:
+                        aulog.info("Unxpected statements")
+                        return -1
 
                     status = host.expect_exact( "#", timeout = tout_cmd)
 
-                except :
-		    aulog.debug(host.before)
+                except Exception as e:
                     aulog.debug("Command: Timed out, before considering this as failure")
+                    aulog.debug(str(e))
+		    aulog.debug(host.before)
                     return -1
 
                 # reset terminal length
