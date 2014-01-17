@@ -100,7 +100,7 @@ class IPlugin(object):
 
             if srp == '':  # No Standby RP, nothing to do
                 retval = 0
-                return retval
+                return retval, srp
 
             # check Standby RP state
 
@@ -109,6 +109,7 @@ class IPlugin(object):
                 host.sendline(cmd)
                 host.expect(self.prompt)
 
+                # reload Standby RP
                 cmd = 'admin reload location ' + srp
                 host.sendline(cmd)
                 status = 0
@@ -125,19 +126,20 @@ class IPlugin(object):
                 aulog.info("rommon 3> sync")
                 aulog.info("rommon 4> reset")
                 aulog.info(" ")
-  
+
             else:
                 aulog.info("Stabdby RP is not in IOS XR RUN state.")
                 aulog.info("You may need to update IOS-XR of Standby RP manually.")
                 aulog.info("Besides that, this could interrupt the Turboboot process.")
                 aulog.info(" ")
+
             retval = 0
 
         except Exception as e:
             aulog.debug(str(e))
             retval = -1
 
-        return retval
+        return retval, srp
 
     # set 0x0 to confreg and reload the device
     def reload(self, host):
@@ -241,13 +243,12 @@ class IPlugin(object):
                 retval, card_num, valid_card_num = self.count_valid_cards(host)
                 if retval == -1:
                     return retval
-                elif valid_card_num == pre_valid_card_num:
+                elif valid_card_num >= pre_valid_card_num:
                      break
                 sleep(60) # wait for one minutes
                 counter += 1
-            # end of outer while
             
-            if  valid_card_num == pre_valid_card_num: 
+            if  valid_card_num >= pre_valid_card_num: 
                 retval = 0
                 aulog.info("All cards seem to reach the valid status")
             else:
@@ -380,13 +381,16 @@ class IPlugin(object):
             return retval
 
         # get the standby rp in rommon
-        retval = self.shutdown_standby_rp(host)
+        retval, srp = self.shutdown_standby_rp(host)
         if retval == -1:
             aulog.error("connot get the standby rp into rommon mode before turboboot.")
             return retval        
 
+        # wait for standby becomes rommon mode
+        # it may take more than 10 seconds
+        sleep(60)
+
         # reload the devince and get it into rommon mode
-        sleep(60) # wait for standby becomes rommon mode
         retval = self.reload(host)
         if retval == -1:
             return retval
@@ -398,6 +402,12 @@ class IPlugin(object):
         if retval == -1:
             return retval
         aulog.info("Start Turboboot.")
+
+        # after tuboboot, standby RP may not be in valid state 
+        # because it is in rommon mode.
+        # the number of valid cards should be decrement
+        if srp != '':
+            valid_card_num -= 1
 
         # monitor the preogress of turbo boot
         login = options.login2
