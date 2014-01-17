@@ -312,21 +312,50 @@ class IPlugin(object):
             retry_count = 20
             while retry_count :
                 try :
-                    host.sendline("\r\n")
+                    host.send('\r')
                     sleep(1)
                     host.expect(USERNAME,timeout=3)
                     host.sendline(login)
                     host.expect(PASS,timeout=3)
                     host.sendline(passwd)
-                    host.expect(self.prompt,timeout=3)
+                    status = -1
+                    status = host.expect([self.prompt, ':ios#'], timeout=3)
                     break
                 except : 
                     aulog.info(host.before)
                     host.expect(".*")
                     retry_count = retry_count - 1
 
-            aulog.info("Login after turboboot successful..")
+            if status == -1:
+                aulog.info("Cannot login after turboboot")
+                aulog.debug(host.before)
+                retval = -1
+                return retval
 
+            elif status == 0:
+                aulog.info("Login after turboboot successful..")
+
+            else:
+                aulog.info("Login after turboboot successful..")
+                aulog.info("But CLI prompt does not chage to " + self.prompt +", yet.")
+
+                # wait for prompt chaging to location:hostname# 
+                retry_count = 30
+                while retry_count :
+                    host.send('\r')
+                    status = host.expect([self.prompt, pexpect.TIMEOUT], timeout=60)
+                    if status == 0:
+                        aulog.info("CLI prompt has chaged to " + self.prompt)
+                        break
+                    else:
+                        aulog.info(host.before[-100:])
+                        retry_count -= 1
+
+                if retry_count == 0:
+                    aulog.info("CLI prompt does not become " + self.promt)
+                    aulog.info("active RP does not avaliable, yet.")
+                    retval = -1
+                    return retval
 
             # watch all cards status
             retval = self.watch_platform(host, pre_valid_card_num)
