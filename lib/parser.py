@@ -67,7 +67,12 @@ def parsecli():
 
     oparser.add_option("-d", "--device", dest="device", default=None, metavar="'x.x.x.x'",
         help="The device you want to run this script against. Example below..\n"
-              "-d '192.168.101.1', --device='192.168.101.1'")
+              "-d '192.168.101.1 2002', where 2002 is port and is optional")
+
+    oparser.add_option("-s", "--standby", dest="standby", default=None, metavar="'x.x.x.x'",
+        help="The address of standby to run this script against. Example below..\n"
+              "-s '192.168.101.1 2002'' where 2003 is port and is optional ")
+
     oparser.add_option("-t", "--term", dest="terminal", default="both", metavar="Protocol", 
         help="What terminal you are going to use (ssh or telnet or both) The default is to use both."
              " Example below.. -t 'ssh', --term='ssh'")

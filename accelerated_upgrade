@@ -262,7 +262,10 @@ def telnet_login(host_list, login, passwd, connect_retry = 3):
             aulog.error("Could not reach to device : %s "%(host,))
 
     session = "telnet " + host
-    command = pexpect.spawn( session, maxread=MAXREAD, searchwindowsize=WINDOWSIZE  )
+    log_file_name = "%s.console_log"%(host.replace(" ",'_'))
+    log_file = open(log_file_name,"w")
+    
+    command = pexpect.spawn( session, maxread=MAXREAD, searchwindowsize=WINDOWSIZE, logfile=log_file )
     aulog.debug("Connecting to %s using %s" % ( host, session ))
     if term == "telnet":
         while connect_retry > 0 :

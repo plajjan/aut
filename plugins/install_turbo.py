@@ -145,23 +145,26 @@ class IPlugin(object):
 
         host.sendline("admin config-register 0x0")
         try:
-            host.expect(self.prompt)
+            host.expect(self.prompt,timeout=5)
             host.sendline('reload')
-            host.expect('confirm')
-            host.send('\r')
+            host.expect('confirm',timeout=5)
 
             # wait for rommon prompt
             # in some cases, multiple confirmations are needed
-
-            status = host.expect(['rommon \w+ >', 'confirm'], timeout = 60)
-            if status == 1:
-                host.send('\r')
-                status = host.expect(['rommon \w+ >', 'confirm'], timeout = 60)
-            if status == 1:
-                host.send('\r')
-                host.expect(['rommon \w+ >'], timeout = 60)
+            retry_count = 5
+            while retry_count :
+                try :
+                    retry_count = retry_count -1 
+                    host.send('\r')
+                    status = host.expect(['rommon \w+ >', 'confirm'], timeout = 60)
+                    if status == 0:
+                        break
+                except Exception as e :
+                    aulog.debug(host.before)
+                    aulog.debug(str(e))
 
         except Exception as e:
+            aulog.debug(host.before)
             aulog.debug(str(e))
             retval = -1
 
@@ -175,14 +178,12 @@ class IPlugin(object):
 
         try:
             host.sendline('set')
-            status = host.expect(['IP_ADDRESS=(\d+\.\d+\.\d+\.\d+)', PROMPT])
-            if status == 1:
-                aulog.error("IP_ADDRESS is not set")
-                aulog.error("turbo boot needs IP_ADDRESS set at rommon")
-                retval = -1
-                return retval
-            else:
-                host.expect(PROMPT)
+            try :
+                status = host.expect(['IP_ADDRESS=(\d+\.\d+\.\d+\.\d+)'],timeout=10)
+            except :
+                aulog.error("""IP_ADDRESS is not set.
+                               Turbo boot needs IP_ADDRESS set at rommon""")
+            host.expect(PROMPT)
 
             host.sendline('unset BOOT')
             host.expect(PROMPT)
