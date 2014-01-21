@@ -63,7 +63,7 @@ class IPlugin(object):
 
         count = 0
         for line in file:
-            match = re.match(r'.+\.vm-\d+\.\d+\.\d+$', line)
+            match = re.match(r'.+\.vm-.+$|.+\.vm$', line)
             if match:
                 count += 1
                 vm_image = match.group()
@@ -100,7 +100,7 @@ class IPlugin(object):
 
             if srp == '':  # No Standby RP, nothing to do
                 retval = 0
-                return retval
+                return retval, srp
 
             # check Standby RP state
 
@@ -109,6 +109,7 @@ class IPlugin(object):
                 host.sendline(cmd)
                 host.expect(self.prompt)
 
+                # reload Standby RP
                 cmd = 'admin reload location ' + srp
                 host.sendline(cmd)
                 status = 0
@@ -125,19 +126,20 @@ class IPlugin(object):
                 aulog.info("rommon 3> sync")
                 aulog.info("rommon 4> reset")
                 aulog.info(" ")
-  
+
             else:
                 aulog.info("Stabdby RP is not in IOS XR RUN state.")
                 aulog.info("You may need to update IOS-XR of Standby RP manually.")
                 aulog.info("Besides that, this could interrupt the Turboboot process.")
                 aulog.info(" ")
+
             retval = 0
 
         except Exception as e:
             aulog.debug(str(e))
             retval = -1
 
-        return retval
+        return retval, srp
 
     # set 0x0 to confreg and reload the device
     def reload(self, host):
@@ -242,13 +244,12 @@ class IPlugin(object):
                 retval, card_num, valid_card_num = self.count_valid_cards(host)
                 if retval == -1:
                     return retval
-                elif valid_card_num == pre_valid_card_num:
+                elif valid_card_num >= pre_valid_card_num:
                      break
                 sleep(60) # wait for one minutes
                 counter += 1
-            # end of outer while
             
-            if  valid_card_num == pre_valid_card_num: 
+            if  valid_card_num >= pre_valid_card_num: 
                 retval = 0
                 aulog.info("All cards seem to reach the valid status")
             else:
@@ -312,21 +313,50 @@ class IPlugin(object):
             retry_count = 20
             while retry_count :
                 try :
-                    host.sendline("\r\n")
+                    host.send('\r')
                     sleep(1)
                     host.expect(USERNAME,timeout=3)
                     host.sendline(login)
                     host.expect(PASS,timeout=3)
                     host.sendline(passwd)
-                    host.expect(self.prompt,timeout=3)
+                    status = -1
+                    status = host.expect([self.prompt, ':ios#'], timeout=3)
                     break
                 except : 
                     aulog.info(host.before)
                     host.expect(".*")
                     retry_count = retry_count - 1
 
-            aulog.info("Login after turboboot successful..")
+            if status == -1:
+                aulog.info("Cannot login after turboboot")
+                aulog.debug(host.before)
+                retval = -1
+                return retval
 
+            elif status == 0:
+                aulog.info("Login after turboboot successful..")
+
+            else:
+                aulog.info("Login after turboboot successful..")
+                aulog.info("But CLI prompt does not chage to " + self.prompt +", yet.")
+
+                # wait for prompt chaging to location:hostname# 
+                retry_count = 30
+                while retry_count :
+                    host.send('\r')
+                    status = host.expect([self.prompt, pexpect.TIMEOUT], timeout=60)
+                    if status == 0:
+                        aulog.info("CLI prompt has chaged to " + self.prompt)
+                        break
+                    else:
+                        aulog.info(host.before[-100:])
+                        retry_count -= 1
+
+                if retry_count == 0:
+                    aulog.info("CLI prompt does not become " + self.promt)
+                    aulog.info("active RP does not avaliable, yet.")
+                    retval = -1
+                    return retval
 
             # watch all cards status
             retval = self.watch_platform(host, pre_valid_card_num)
@@ -381,13 +411,16 @@ class IPlugin(object):
             return retval
 
         # get the standby rp in rommon
-        retval = self.shutdown_standby_rp(host)
+        retval, srp = self.shutdown_standby_rp(host)
         if retval == -1:
             aulog.error("connot get the standby rp into rommon mode before turboboot.")
             return retval        
 
+        # wait for standby becomes rommon mode
+        # it may take more than 10 seconds
+        sleep(60)
+
         # reload the devince and get it into rommon mode
-        sleep(60) # wait for standby becomes rommon mode
         retval = self.reload(host)
         if retval == -1:
             return retval
@@ -399,6 +432,12 @@ class IPlugin(object):
         if retval == -1:
             return retval
         aulog.info("Start Turboboot.")
+
+        # after tuboboot, standby RP may not be in valid state 
+        # because it is in rommon mode.
+        # the number of valid cards should be decrement
+        if srp != '':
+            valid_card_num -= 1
 
         # monitor the preogress of turbo boot
         login = options.login2
