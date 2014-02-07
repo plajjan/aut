@@ -76,7 +76,7 @@ class IPlugin(object):
         while 1:
             self.command_exec.sendline(cmd)
             try:
-                index = self.command_exec.expect(['The operation is \d+% complete','There are no install requests in operation'],timeout=60,searchwindowsize=1000)
+                index = self.command_exec.expect(['The operation is \d+% complete','There are no install requests in operation'],timeout=300,searchwindowsize=1000)
                 if (index == 1):
                     #we reach here when there is no install operation in progress.
                     #that means either operation completed successfully or failed 
@@ -119,7 +119,7 @@ class IPlugin(object):
                 retval = -1
                 break
             except pexpect.TIMEOUT:
-                aulog.debug("\ntimeout",self.command_exec.before)
+                aulog.debug("\nTimeout :%s"%(self.command_exec.before))
                 aulog.error("TIMEOUT occurred when expecting result of show install req \n")
                 #retval = -1
                 break  
