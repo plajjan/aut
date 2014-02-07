@@ -161,6 +161,7 @@ class IPlugin(object):
         it performs add operation of the pies listed in given file
         """
         retval = 0
+        options = kwargs['options']
         if (kwargs.has_key('repository')):
             repo_str = kwargs['repository']
         else:
@@ -194,6 +195,10 @@ class IPlugin(object):
                 # skip vm image for turbo boot
                 if tmp.find('.vm-') >= 0:
                     continue
+                # Ignore empty lines
+                elif not str.strip(tmp) :
+                    continue
+                
                 file_list = file_list + " " + str.strip(tmp)
        
             #print file_list 
@@ -201,7 +206,10 @@ class IPlugin(object):
             cnumber = re.compile(number)
             #pat = r'Install operation \d+'
             #cpat = re.compile(pat)
-
+            if not file_list and options.turboboot : 
+                aulog.warning("There are no additional packages to be added after Turbo boot")
+                return SKIPPED
+                
             cmd = "admin install add source %s %s"%(repo_str,file_list)
             aulog.info(cmd) 
             #expecting terminal
@@ -284,6 +292,9 @@ class IPlugin(object):
 
         if (retval == 0):
             retval = self.install_add(kwargs)
+        if (retval == SKIPPED ):
+            # Install operation is skipped
+            return 0 
         if (retval == 0):
             retval = self.watch_operation()
         return int(retval)

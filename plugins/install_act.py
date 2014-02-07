@@ -177,7 +177,7 @@ class IPlugin:
         #added packages to be executed
         tobe_activated = self.get_tobe_activated_pkglist(host,kwargs)
         if not tobe_activated :
-            aulog.warning( "The package is already active , nothing to be activated.")
+            aulog.warning( "The package is already active, nothing to be activated.")
             return SKIPPED
         cmd = " admin install activate %s prompt-level none"%(tobe_activated)
         aulog.info(cmd)

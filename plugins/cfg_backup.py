@@ -48,11 +48,17 @@ class IPlugin(object):
 
 	def start(self, **kwargs):
 
-                # Get the session
-                dev_string = kwargs['options'].device.replace(" ","_")
-                CFG_BKP_FILE = ".cfg_bkup." + dev_string
 
+                # Get the session
                 host = kwargs['session']
+
+                if kwargs['options'].device :
+                    dev_string = kwargs['options'].device.replace(" ","_")
+                else :
+                    name = kwargs['session'].name
+                    dev_string = ".".join(re.findall(r"[\w']+","_".join(name.split(" ")[1:])))
+
+                CFG_BKP_FILE = dev_string + ".cfg_bkup"
 		aulog.debug("Backing up configurations in file %s..."%(CFG_BKP_FILE))
                 try :
                    host.expect_exact("#", timeout = 15)
@@ -68,7 +74,7 @@ class IPlugin(object):
                     host.sendline("show running")
 
                     status = host.expect_exact( ["end\r\n", INVALID_INPUT, EOF], timeout = tout_cmd)
-		    self.save_configs(host.before, '.configuration_backup_file')
+		    self.save_configs(host.before, CFG_BKP_FILE)
                     if status != 0:
                         aulog.info("Unxpected statements")
                         return -1
