@@ -68,12 +68,15 @@ class NewPackage():
         pkg_expr_2pkg = re.compile(r'(?P<PLATFORM>\w+)-(?P<PKGNAME>\w+)-(?P<SUBPKGNAME>\w+)-(?P<ARCH>p\w+)\.(?P<PKGFORMAT>\w+)-(?P<VERSION>\d+\.\d+\.\d+)')
         pkg_expr = re.compile(r'(?P<PLATFORM>\w+)-(?P<PKGNAME>\w+)-(?P<ARCH>p\w+)\.(?P<PKGFORMAT>\w+)-(?P<VERSION>\d+\.\d+\.\d+)')
         smu_expr = re.compile(r'(?P<PLATFORM>\w+)-(?P<ARCH>\w+)-(?P<VERSION>\d+\.\d+\.\d+)\.(?P<PKGNAME>\w+)\.(?P<PKGFORMAT>\w+)')
+        smu_expr2 = re.compile(r'(?P<PLATFORM>\w+)-(?P<ARCH>\w+)-(?P<VERSION>\d+\.\d+\.\d+)\.(?P<PKGNAME>\w+)-(?P<SMUVERSION>\d+\.\d+\.\d+)\.(?P<PKGFORMAT>\w+)')
         pkgobj = PackageClass()
         p = pkg_expr_2pkg.search(pkg)
         if not p  :
             p = pkg_expr.search(pkg)
         if not p  :
             p = smu_expr.search(pkg)
+        if not p  :
+            p = smu_expr2.search(pkg)
         if p :
             if p.group("PKGFORMAT") == PIE :
                 pkgobj.platform = p.group("PLATFORM")
@@ -206,7 +209,7 @@ def pkg_tobe_activated(added_pkgs,inactive_pkgs,active_pkgs):
         for pk1 in added_pkgs:
             for pk2 in inactive_pkgs:
                 if pk1.pkg == pk2.pkg and pk1.version == pk2.version :
-                    if len(pk2.pkg) == 10 and pk2.pkg[:3] == "CSC" :
+                    if len(pk2.pkg) == 10 and pk2.pkg[:3] == "CSC" or pk2.pkg[:2] == "sp" or pk2.pkg[:2] == 'fp':
                         # It's a SMU format is
                         #disk0:asr9k-px-4.3.2.CSCuj61599-1.0.0
                         pkg = "%s:%s-%s-%s.%s-%s"%(pk2.partition,pk2.platform,pk2.arch,

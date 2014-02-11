@@ -59,17 +59,3 @@ class IPlugin(object):
         except :
             pass
         return 0
- 
-         
-    def stop(self):
-        """
-        """
-        pass
- 
-def main():
-    var1 = IPlugin()
-    var1.start()
- 
-if __name__ == '__main__':
-    main()
-   

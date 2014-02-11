@@ -450,8 +450,3 @@ class IPlugin(object):
 
         return retval 
 
-    def stop(self):
-        """
-        """
-        pass
-

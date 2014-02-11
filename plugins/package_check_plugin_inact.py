@@ -63,8 +63,4 @@ class IPlugin(object):
                 self.save_packages(host.before, '.inactive_file' );
 		sleep(5)
 		return 0;
-        def stop(self):
-            """
-            """
-            pass
 

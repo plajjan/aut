@@ -300,13 +300,5 @@ class IPlugin(object):
         return int(retval)
         pass
 
-    def stop(self):
-        """
-        Stops the plugin (and prepares for deallocation)
-        """
-        #closing file opened for logging purposes
-        #self.log_file.close()
-        #self.error_log_file.close()
-        pass
 
 

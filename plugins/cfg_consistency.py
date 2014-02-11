@@ -95,9 +95,4 @@ class IPlugin:
         #9. mirror location 0/RSP0/CPU0 disk0:disk1:
         return 0
 
-    def stop(self):
-        """
-        Stops the plugin (and prepares for deallocation)
-        """
-        pass
 

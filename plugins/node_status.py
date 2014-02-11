@@ -105,17 +105,3 @@ class IPlugin(object):
         print "All nodes are in correct state..."
         return 0 
 
- 
-         
-    def stop(self):
-        """
-        """
-        pass
- 
-def main():
-    var1 = IPlugin()
-    var1.start()
- 
-if __name__ == '__main__':
-    main()
-   

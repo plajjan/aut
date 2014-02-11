@@ -1,4 +1,4 @@
-#! /router/bin/python
+#! /router/bin/python-2.7.4
 
 #==============================================================================
 # accelerated_upgrade.py -  main routine for accelerated upgrade
@@ -216,10 +216,17 @@ def reachable(host) :
     cmd = "ping -c 2 %s"%(host)
     status,output = commands.getstatusoutput(cmd)
     ping_response = resp.search(output)
-    if int(ping_response.group('recvd')):
+
+    try: 
+        if int(ping_response.group('recvd')):
+            return True
+        else :
+            print "Warning: Could not reach to host: %s, still continuing"%(host)
+            return True
+    except : 
+        # This will be cases where DNS is not resloved
+        print "Warning: Could not ping host: %s, still continuing"%(host)
         return True
-    else :
-        return False
 
 def get_prompt(host):
      retry_count = 0
@@ -456,8 +463,9 @@ def command_exec(dline, options):
             # wait for a minute complete install operation
             # after success
             print_success("\n++++ Please wait while systems comes up with new set of packages ++++\n")
-            # Wait for 60 sec and then strt polling if system is up
-            wait_loop(60)
+
+            # Wait for 300 sec and then strt polling if system is up
+            wait_loop(300)
 
             while retry < 10:
                 try:

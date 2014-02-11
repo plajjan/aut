@@ -26,6 +26,7 @@ import os
 import sys
 import re
 from lib.global_constants import *
+from lib import aulog
 
 class IPlugin(object):
     """
@@ -46,7 +47,7 @@ class IPlugin(object):
         host = kwargs['session']
         pkg_path = kwargs['repository']
         if (not pkg_path):
-           print "Couldn't ping, package repository path is not provided"
+           aulog.error("Couldn't ping, package repository path is not provided")
            return -1 
         try :
             host.expect_exact("#", timeout=30)
@@ -59,7 +60,7 @@ class IPlugin(object):
         list = [' '];
         list = pkg_path.split('/')
         if not len(ipaddr) :
-            print >> sys.stderr, "Invalid TFTP address "   
+            aulog.error("Invalid TFTP address ") 
             return -1
 
         if ( len(list[0]) if list[0] else list[1] in protocol):
@@ -69,22 +70,15 @@ class IPlugin(object):
             try :
                 status = host.expect_exact( [INVALID_INPUT, MORE, "#", PROMPT, EOF], timeout = tout_cmd)
             except :
-	        print "Command: Timed out, before considering this as failure"
-                print "Please check following log file for details\n%s"%(host.logfile)
-                return -1;
+	        aulog.warning("""Command: Timed out, before considering this as failure.
+                                 Please check consolelog file for details""")
+                return 0
 
         out = host.before
         if (out.find('Success rate is 0') != -1 or
             out.find('Bad hostname or protocol not running') != -1 or 
             out.find('UUUUU') != -1):
-            print >> sys.stderr, "TFTP server %s is not reachable from device"%(ipaddr)   
-            return -1
+            aulog.warning("TFTP server %s is not reachable from device"%(ipaddr)) 
+            return 0
         return 0
-
-    def stop(self):
-        """
-        Stops the plugin (and prepares for deallocation)
-        """
-        pass
-
 

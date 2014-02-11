@@ -43,7 +43,7 @@ class IPlugin:
         #expecting install method
         host.sendline()
         try:
-            index = host.expect(['Install Method: Parallel Process Restart','This operation will reload the following node:'],searchwindowsize=1000,timeout=30)
+            index = host.expect(['Install Method: Parallel Process Restart','This operation will reload the following nod'],searchwindowsize=1000,timeout=30)
         except Exception,e:
             output = str(type(e))
             aulog.error("Exception occured while expecting install method\n%s,\n%s"%(host.before,output))
@@ -241,11 +241,6 @@ class IPlugin:
             restart_type = self.watch_operation(host)
         return int(restart_type )
 
-    def stop(self):
-        """
-        Stops the plugin (and prepares for deallocation)
-        """
-        pass
 
 
 

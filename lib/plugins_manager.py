@@ -77,13 +77,6 @@ class IPlugin(object):
         """
         pass
 
-    def stop(self):
-        """
-        Stops the plugin (and prepares for deallocation)
-        """
-        pass
-
-
 class PluginsManager(object):
     """
     The plugins manager keeps a list of plugins instances
@@ -160,8 +153,6 @@ class PluginsManager(object):
             aulog.debug("\t%s" % (p))
         plugins =  [os.path.abspath(p) for p in plugins_list if p]
 
-        # Stop execution of any plugins of running 
-        self.stop()
         del self.plugins[:]
         del self.active[:]    
 

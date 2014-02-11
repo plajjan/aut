@@ -60,8 +60,4 @@ class IPlugin(object):
                 self.save_packages(host.before, '.commit_file' );
 		sleep(5)
 		return 0;
-        def stop(self):
-         """
-         """
-         pass
 

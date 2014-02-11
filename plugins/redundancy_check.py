@@ -75,15 +75,3 @@ class IPlugin(object):
             #print "No standby node found. Upgrade can proceed"
             print ""
             return 0
-     
-    def stop(self):
-        """
-        """
-        pass
-def main():
-    var1 = IPlugin()
-    var1.start()
- 
-if __name__ == '__main__':
-    main()
- 

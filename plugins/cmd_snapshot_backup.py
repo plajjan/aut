@@ -100,7 +100,3 @@ class IPlugin(object):
                     pass
 		return 0
 
-        def stop(self):
-            """
-            """
-            pass

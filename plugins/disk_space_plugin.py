@@ -157,7 +157,3 @@ class IPlugin(object):
         return -1
 
 
-    def stop(self):
-        """
-        """
-        pass
