@@ -61,6 +61,12 @@ class IPlugin(object):
         print "     a) IOS XR RUN"
         print "     b) PRESENT"
         print "     c) UNPOWERED"
+        print "     d) READY"
+        print "     e) FAILED"
+        print "     f) OK"
+        print "     g) NOT ALLOW ONLIN"
+        print "     h) DISABLED"
+
         # Get 'show platform status o/p
         try :
             host.expect_exact("#", timeout=30)
@@ -78,8 +84,7 @@ class IPlugin(object):
         # Parse string based on newline
         newstring = host.before.split("\n",50)
         lib.global_constants.srp=self.get_standby_node(host.before.split('\n'))
-
-        valid_state = ['IOS XR RUN', 'PRESENT','READY', 'UNPOWERED', 'FAILED', 'OK', 'DISABLED']
+        valid_state = ['IOS XR RUN', 'PRESENT','READY', 'UNPOWERED', 'FAILED', 'OK', 'NOT ALLOW ONLIN', 'DISABLED']
         try :
             host.expect_exact("#", timeout=30)
         except :
